@@ -29,7 +29,7 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
 
 There is at most one instance of a NamedTuple type with a given set of Members and Types, hence
 
-    typeof( @NT( a::Int64, b::Float64 ) ) == typeof( @NT( a => 1, b => 2.0 ))
+    typeof( @NT( a::Int64, b::Float64 )(1, 3.0) ) == typeof( @NT( a => 1, b => 2.0 ))
 
 NamedTuple definitions are shared across all modules. The underlying imutable types are constructed at first use.
 

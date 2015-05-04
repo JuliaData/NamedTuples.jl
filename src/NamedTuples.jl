@@ -10,6 +10,8 @@ Base.length( t::NamedTuple ) = length( names( t ))
 Base.start( t::NamedTuple ) = 1
 Base.done( t::NamedTuple, iter ) = iter<length( names( NamedTuple ))
 Base.next( t::NamedTuple, iter ) = ( ( names(t)[iter], getfield( t, iter )), iter += 1)
+Base.endof( t::NamedTuple ) = length( t )
+Base.last( t::NamedTuple ) = (names(t)[end], t[end] )
 Base.writemime(io::IO, ::MIME"text/plain", t::NamedTuple) = show( io, t )
 Base.show( io::IO,t::NamedTuple) = print( io, "(", join([ "$k => $v" for (k,v) in t ], ", ") ,")")
 # Make this indexable so that it works like a Tuple
