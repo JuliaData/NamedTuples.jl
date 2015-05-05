@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # NamedTuples
 
 Syntax
@@ -47,3 +48,7 @@ NamedTuples support iteration, indexing and behave as immutable associative cont
     end
 
 [![Build Status](https://travis-ci.org/mdcfrancis/NamedTuples.jl.svg?branch=master)](https://travis-ci.org/mdcfrancis/NamedTuples.jl)
+=======
+# NamedTuples.jl
+NamedTuples.jl
+>>>>>>> 56566d368c8b4ad7d02605b71b7d8438250c84cd
