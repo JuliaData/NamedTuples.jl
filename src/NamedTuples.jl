@@ -16,8 +16,12 @@ Base.writemime(io::IO, ::MIME"text/plain", t::NamedTuple) = show( io, t )
 Base.show( io::IO,t::NamedTuple) = print( io, "(", join([ "$k => $v" for (k,v) in t ], ", ") ,")")
 # Make this indexable so that it works like a Tuple
 Base.getindex( t::NamedTuple, i::Int ) = getfield( t, i )
+Base.getindex( t::NamedTuple, i::UnitRange{Int64}) = slice( t, i )
 # We also support indexing by symbol
 Base.getindex( t::NamedTuple, i::Symbol ) = getfield( t, i )
+Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default)
+# This is a linear lookup...
+Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 # Deep compare
 function ==( lhs::NamedTuple, rhs::NamedTuple)
     ( lhs === rhs ) && return true
@@ -38,12 +42,14 @@ function Base.hash( nt::NamedTuple, hs::Uint)
     return h
 end
 
+
 # Helper type, for transforming parse tree to NameTuple definition
 immutable ParseNode{T} end
 
 # Error paths
-trans{T}( ::Type{ParseNode{T}}, expr::Expr) = error( "Invalid NamedTuple, syntax error '$expr'")
-trans{T}( n::T ) = error( "Invalid NamedTuple, Unexpected leaf node type '$n'")
+#trans{T}( ::Type{ParseNode{T}}, expr::Expr) = error( "Invalid NamedTuple, syntax error '$expr'")
+#trans{T}( n::T ) = error( "Invalid NamedTuple, Unexpected leaf node type '$n'")
+
 
 function trans( ::Type{ParseNode{:Symbol}}, expr::Expr)
     (expr.args[1],nothing,nothing)
@@ -59,8 +65,13 @@ function trans( ::Type{ParseNode{:(=>)}}, expr::Expr)
     return (sym, typ, escape( expr.args[2] ))
 end
 
+# Allow unary
 function trans( ::Type{ParseNode{:(::)}}, expr::Expr)
-    ( expr.args[1], expr.args[2], nothing)
+    if( length( expr.args ) > 1 )
+        return ( expr.args[1], expr.args[2], nothing)
+    else
+        return ( nothing, expr.args[1], nothing)
+    end
 end
 
 function trans( expr::Expr )
@@ -71,13 +82,22 @@ function trans( sym::Symbol )
     return (sym, nothing, nothing)
 end
 
+# Literal nodes
+function trans{T}( lit::T )
+    return (nothing, nothing, escape(lit) )
+end
+
+function trans{T}( ::Type{ParseNode{T}}, expr::Expr)
+    return (nothing, nothing, escape(expr) )
+end
+
 #
 # Create a NameTuple in the context of this module
 # this is only done if the tuple has not already been
 # constructed.
 function create_tuple( fields::Vector{Symbol})
     len = length( fields )
-    name = symbol( string( "_NT_", join( fields, "_")) )
+    name = symbol( string( "_NT_", join( fields)) )
     types = [symbol("T$n") for n in 1:len]
     tfields = [ Expr(:(::), symbol( fields[n] ), symbol( "T$n") ) for n in 1:len ]
     def = Expr(:type, false, Expr( :(<:), Expr( :curly, name, types... ), :NamedTuple ), Expr(:block, tfields...) )
@@ -91,7 +111,7 @@ end
 # Given a symbol list create the NamedTuple
 #
 @doc doc"Given a symbol vector create the `NamedTuple`" ->
-function make_ttuple( syms::Vector{Symbol} )
+function make_tuple( syms::Vector{Symbol} )
     name = create_tuple( syms )
     return name
 end
@@ -100,7 +120,7 @@ end
 # Given an expression vector create the NamedTuple
 #
 @doc doc"Given an extression vector create the `NamedTuple`" ->
-function make_ttuple( exprs::Vector{Expr})
+function make_tuple( exprs::Vector)
     len    = length( exprs )
     fields = Array(Symbol, len)
     values = Array(Any, len)
@@ -112,12 +132,12 @@ function make_ttuple( exprs::Vector{Expr})
     # handle the case where this is defining a datatype
     for( i in 1:len )
         expr = exprs[i]
-        ( sym, typ, val ) = trans( ParseNode{expr.head}, expr )
+        ( sym, typ, val ) = trans( expr )
         if( construct == true && val == nothing || ( i > 1 && construct == false && val != nothing ))
             error( "Invalid tuple, all values must be specified during construction @ ($expr)")
         end
         construct  = val != nothing
-        fields[i]  = sym
+        fields[i]  = sym != nothing?sym:symbol( "_$(i)_")
         typs[i] = typ
         # On construction ensure that the types are consitent with the declared types, if applicable
         values[i]  = ( typ != nothing && construct)? Expr( :call, :convert, typ, val ) : val
@@ -162,9 +182,54 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
     Test.bar( @NT( a=> 2, c=>"hello")) # Returns `hellohello`
 """ ->
 macro NT( expr::Expr... )
-    return make_ttuple( collect( expr ))
+    return make_tuple( collect( expr ))
 end
 
-export @NT, NamedTuple
+@doc doc"""
+Create a slice of an existing NamedTuple using a UnitRange. Construct a new NamedTuple with
+the result.
+This copies the underlying data.
+""" ->
+function Base.slice( t::NamedTuple, rng::UnitRange{Int64})
+    name = create_tuple( names(t)[rng] )
+    # FIXME - shoudl handle the type only case
+    return eval( Expr( :call, name, [ getfield( t, i ) for i in rng ] ... ) )
+end
+
+@doc doc"""
+Merge two NamedTuples favoring the lhs
+Order is preserved lhs names come first.
+This copies the underlying data.
+""" ->
+function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
+    nms = unique( vcat( names( lhs ), names( rhs )) )
+    name = create_tuple( nms )
+    # FIXME should handle the type only case
+    vals = [ haskey( lhs, nm ) ? lhs[nm] : rhs[nm] for nm in nms ]
+    return eval( Expr( :call, name, vals... ) )
+end
+
+@doc doc"""
+Create a new NamedTuple with the new value set on it, either overwriting
+the old value or appending a new value.
+This copies the underlying data.
+""" ->
+function setindex{V}( t::NamedTuple, key::Symbol, val::V)
+    nt = eval( make_tuple( [ Expr( :(=>), key, val  )]))
+    return merge( t, nt )
+end
+
+@doc doc"""
+Create a new NamedTuple with the secifed element removed.
+This copies the underlying data.
+""" ->
+function delete( t::NamedTuple, key::Symbol )
+    nms = filter( x->x!=key, names( t ) )
+    name = create_tuple( nms )
+    vals = [ getindex( t, nm ) for nm in nms ]
+    return eval( Expr( :call, name, vals... ) )
+end
+
+export @NT, NamedTuple, setindex, delete
 
 end # module
