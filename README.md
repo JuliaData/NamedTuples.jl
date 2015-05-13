@@ -63,6 +63,6 @@ implementation is functional rather than performance oriented.
     NamedTuples.delete( x, :a) # (b=>2,c=>3,x=>123)
     merge( nt, @NT( d => "hello", e => "world")) # ( a=>1,b=>2,c=>3,d=>"hello",e=>"world")
 
-Note the use of `setindex/delete` and not `setindex!/delete!` as these operations do not modify in place.
+Note the use of `setindex/delete` and not `setindex!/delete!` as these operations do NOT modify in place.
 
 [![Build Status](https://travis-ci.org/mdcfrancis/NamedTuples.jl.svg?branch=master)](https://travis-ci.org/blackrock/NamedTuples.jl)
