@@ -65,4 +65,4 @@ implementation is functional rather than performance oriented.
 
 Note the use of `setindex/delete` and not `setindex!/delete!` as these operations do NOT modify in place.
 
-[![Build Status](https://travis-ci.org/mdcfrancis/NamedTuples.jl.svg?branch=master)](https://travis-ci.org/blackrock/NamedTuples.jl)
+[![Build Status](https://travis-ci.org/blackrock/NamedTuples.jl.svg?branch=master)](https://travis-ci.org/blackrock/NamedTuples.jl)
