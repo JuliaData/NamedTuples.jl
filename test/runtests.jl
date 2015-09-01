@@ -5,6 +5,10 @@ using Base.Test
 @test @NT( a => 1 )[1] == 1
 @test @NT( a => 1 )[:a] == 1
 
+@test @NT( :a => 1 ).a == 1
+@test @NT( :a => 1 )[1] == 1
+@test @NT( :a => 1 )[:a] == 1
+
 @test length( @NT( a => 1)) == 1
 @test length( @NT( a => 1, b => 2.0)) == 2
 
@@ -54,5 +58,3 @@ y = delete( x, :a)
 @test x.c == 3
 
 @test merge( nt, @NT( d => "hello", e => "world"))  == @NT( a=>1,b=>2,c=>3,d=>"hello",e=>"world")
-
-

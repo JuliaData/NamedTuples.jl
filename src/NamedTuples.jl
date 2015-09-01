@@ -1,17 +1,20 @@
 module NamedTuples
 
-VERSION < v"0.4-"&& using Docile
+if VERSION < v"0.4-"
+   using Docile
+   fieldnames = names
+end
 
 abstract NamedTuple <: Associative
-Base.keys( t::NamedTuple ) = names( t )
+Base.keys( t::NamedTuple ) = fieldnames( t )
 Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in names( t )]
-Base.length( t::NamedTuple ) = length( names( t ))
+Base.length( t::NamedTuple ) = length( fieldnames( t ))
 # Iteration
 Base.start( t::NamedTuple ) = 1
-Base.done( t::NamedTuple, iter ) = iter<length( names( NamedTuple ))
-Base.next( t::NamedTuple, iter ) = ( ( names(t)[iter], getfield( t, iter )), iter += 1)
+Base.done( t::NamedTuple, iter ) = iter<length( fieldnames( NamedTuple ))
+Base.next( t::NamedTuple, iter ) = ( ( fieldnames(t)[iter], getfield( t, iter )), iter += 1)
 Base.endof( t::NamedTuple ) = length( t )
-Base.last( t::NamedTuple ) = (names(t)[end], t[end] )
+Base.last( t::NamedTuple ) = (fieldnames(t)[end], t[end] )
 Base.writemime(io::IO, ::MIME"text/plain", t::NamedTuple) = show( io, t )
 Base.show( io::IO,t::NamedTuple) = print( io, "(", join([ "$k => $v" for (k,v) in t ], ", ") ,")")
 # Make this indexable so that it works like a Tuple
@@ -23,7 +26,8 @@ Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default)
 # This is a linear lookup...
 Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 # Deep compare
-function ==( lhs::NamedTuple, rhs::NamedTuple)
+
+function Base.(:(==))( lhs::NamedTuple, rhs::NamedTuple)
     ( lhs === rhs ) && return true
     ( typeof( lhs ) != typeof( rhs )) && return false
     for( i in 1:length( lhs ))
@@ -45,11 +49,6 @@ end
 
 # Helper type, for transforming parse tree to NameTuple definition
 immutable ParseNode{T} end
-
-# Error paths
-#trans{T}( ::Type{ParseNode{T}}, expr::Expr) = error( "Invalid NamedTuple, syntax error '$expr'")
-#trans{T}( n::T ) = error( "Invalid NamedTuple, Unexpected leaf node type '$n'")
-
 
 function trans( ::Type{ParseNode{:Symbol}}, expr::Expr)
     (expr.args[1],nothing,nothing)
@@ -80,6 +79,10 @@ end
 
 function trans( sym::Symbol )
     return (sym, nothing, nothing)
+end
+
+function trans( ::Type{ParseNode{:quote}}, expr::Expr )
+    return trans( expr.args[1] )
 end
 
 # Literal nodes
@@ -191,7 +194,7 @@ the result.
 This copies the underlying data.
 """ ->
 function Base.slice( t::NamedTuple, rng::UnitRange{Int64})
-    name = create_tuple( names(t)[rng] )
+    name = create_tuple( fieldnames(t)[rng] )
     # FIXME - shoudl handle the type only case
     return eval( Expr( :call, name, [ getfield( t, i ) for i in rng ] ... ) )
 end
@@ -202,7 +205,7 @@ Order is preserved lhs names come first.
 This copies the underlying data.
 """ ->
 function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
-    nms = unique( vcat( names( lhs ), names( rhs )) )
+    nms = unique( vcat( fieldnames( lhs ), fieldnames( rhs )) )
     name = create_tuple( nms )
     # FIXME should handle the type only case
     vals = [ haskey( lhs, nm ) ? lhs[nm] : rhs[nm] for nm in nms ]
@@ -224,7 +227,7 @@ Create a new NamedTuple with the secifed element removed.
 This copies the underlying data.
 """ ->
 function delete( t::NamedTuple, key::Symbol )
-    nms = filter( x->x!=key, names( t ) )
+    nms = filter( x->x!=key, fieldnames( t ) )
     name = create_tuple( nms )
     vals = [ getindex( t, nm ) for nm in nms ]
     return eval( Expr( :call, name, vals... ) )
