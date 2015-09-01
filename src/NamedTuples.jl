@@ -122,7 +122,7 @@ end
 #
 # Given an expression vector create the NamedTuple
 #
-@doc doc"Given an extression vector create the `NamedTuple`" ->
+@doc doc"Given an expression vector create the `NamedTuple`" ->
 function make_tuple( exprs::Vector)
     len    = length( exprs )
     fields = Array(Symbol, len)
