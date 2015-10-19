@@ -41,7 +41,7 @@ nt = @NT( a=>1, b=>2, c=>3 )
 @test nt.a == 1
 @test nt.b == 2
 @test nt.c == 3
-@test haskey( nt, x ) == false
+@test haskey( nt, :x ) == false
 x = setindex( nt, :x, 123 )
 @test x.x == 123
 @test x.a == 1
