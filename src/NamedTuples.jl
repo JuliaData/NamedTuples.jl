@@ -38,7 +38,7 @@ function Base.(:(==))( lhs::NamedTuple, rhs::NamedTuple)
     return true
 end
 # Deep hash
-function Base.hash( nt::NamedTuple, hs::Uint)
+function Base.hash( nt::NamedTuple, hs::UInt)
     h = 17
     for( v in values(nt) )
         h = h * 23 + hash( v, hs )
