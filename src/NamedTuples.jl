@@ -156,6 +156,10 @@ function make_tuple( exprs::Vector)
     end
 end
 
+function nt_eval( expr::Vector )
+  return eval( make_tuple( expr ) )
+end
+
 @doc doc"""
 Syntax
 
