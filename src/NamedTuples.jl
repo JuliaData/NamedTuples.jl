@@ -7,7 +7,7 @@ end
 
 abstract NamedTuple <: Associative
 Base.keys( t::NamedTuple ) = fieldnames( t )
-Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in names( t )]
+Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in fieldnames( t )]
 Base.length( t::NamedTuple ) = length( fieldnames( t ))
 # Iteration
 Base.start( t::NamedTuple ) = 1
