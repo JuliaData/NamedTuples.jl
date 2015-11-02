@@ -40,6 +40,7 @@ function Base.(:(==))( lhs::NamedTuple, rhs::NamedTuple)
     return true
 end
 # Deep hash
+
 function Base.hash( nt::NamedTuple, hs::UInt64)
     h = 17
     for( v in values(nt) )
@@ -160,6 +161,10 @@ function make_tuple( exprs::Vector)
     else
         return Expr( :call, esc( name ), values ... )
     end
+end
+
+function nt_eval( expr::Vector )
+  return eval( make_tuple( expr ) )
 end
 
 @doc doc"""
