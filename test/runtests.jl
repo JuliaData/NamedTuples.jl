@@ -16,7 +16,11 @@ using Base.Test
 @test last( @NT( a => 1, b => "hello", c => 2.0 )) == ( :c, 2.0)
 @test [ v for( (k,v) in @NT( a => 1.0, b => 2.0 ) ) ] == [ 1.0, 2.0 ]
 
+<<<<<<< HEAD
 @test ( x = @NT( a::Int64, b::Float64 )( 1, 2.0 ) ; typeof(x.a) == Int64 && typeof(x.b) == Float64 )
+=======
+@test ( x = @NT( a::Int64, b::Float64 )( 1, 2.0 ) ; fieldtype( typeof(x), :a ) == Int64 && fieldtype( typeof(x), :b) == Float64 )
+>>>>>>> be099f8
 @test @NT( a => 1, b => "hello")  ==  @NT( a, b )( 1, "hello")
 @test @NT( a => 1) != @NT( b => 1 )
 
@@ -41,7 +45,7 @@ nt = @NT( a=>1, b=>2, c=>3 )
 @test nt.a == 1
 @test nt.b == 2
 @test nt.c == 3
-@test haskey( nt, x ) == false
+@test haskey( nt, :x ) == false
 x = setindex( nt, :x, 123 )
 @test x.x == 123
 @test x.a == 1
