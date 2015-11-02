@@ -1,3 +1,4 @@
+__precompile__()
 module NamedTuples
 
 if VERSION < v"0.4-"
@@ -6,8 +7,9 @@ if VERSION < v"0.4-"
 end
 
 abstract NamedTuple <: Associative
+
 Base.keys( t::NamedTuple ) = fieldnames( t )
-Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in names( t )]
+Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in fieldnames( t )]
 Base.length( t::NamedTuple ) = length( fieldnames( t ))
 # Iteration
 Base.start( t::NamedTuple ) = 1
@@ -38,7 +40,7 @@ function Base.(:(==))( lhs::NamedTuple, rhs::NamedTuple)
     return true
 end
 # Deep hash
-function Base.hash( nt::NamedTuple, hs::Uint)
+function Base.hash( nt::NamedTuple, hs::UInt64)
     h = 17
     for( v in values(nt) )
         h = h * 23 + hash( v, hs )
@@ -94,6 +96,10 @@ function trans{T}( ::Type{ParseNode{T}}, expr::Expr)
     return (nothing, nothing, escape(expr) )
 end
 
+function runme( mod, builder )
+  eval( mod, builder )
+end
+
 #
 # Create a NameTuple in the context of this module
 # this is only done if the tuple has not already been
@@ -105,8 +111,8 @@ function create_tuple( fields::Vector{Symbol})
     tfields = [ Expr(:(::), symbol( fields[n] ), symbol( "T$n") ) for n in 1:len ]
     def = Expr(:type, false, Expr( :(<:), Expr( :curly, name, types... ), :NamedTuple ), Expr(:block, tfields...) )
     ifdef = Expr(:call, :isdefined, QuoteNode(name))
-    builder = :(!( $ifdef ) && eval( current_module(), $def ) )
-    eval( builder )
+    builder = ( :(!( $ifdef ) && eval( $def ) ) )
+    eval( current_module(), builder )
     return name
 end
 
@@ -115,8 +121,8 @@ end
 #
 @doc doc"Given a symbol vector create the `NamedTuple`" ->
 function make_tuple( syms::Vector{Symbol} )
-    name = create_tuple( syms )
-    return name
+    name  = create_tuple( syms )
+    return esc( name )
 end
 
 #
@@ -150,9 +156,9 @@ function make_tuple( exprs::Vector)
 
     # Either call the constructor with the supplied values or return the type
     if( !construct )
-        return Expr( :curly, name, typs... )
+        return Expr( :curly, esc( name ), typs... )
     else
-        return Expr( :call, name, values ... )
+        return Expr( :call, esc( name ), values ... )
     end
 end
 
@@ -196,7 +202,7 @@ This copies the underlying data.
 function Base.slice( t::NamedTuple, rng::UnitRange{Int64})
     name = create_tuple( fieldnames(t)[rng] )
     # FIXME - shoudl handle the type only case
-    return eval( Expr( :call, name, [ getfield( t, i ) for i in rng ] ... ) )
+    return eval( current_module(), Expr( :call, name, [ getfield( t, i ) for i in rng ] ... ) )
 end
 
 @doc doc"""
@@ -209,7 +215,7 @@ function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
     name = create_tuple( nms )
     # FIXME should handle the type only case
     vals = [ haskey( lhs, nm ) ? lhs[nm] : rhs[nm] for nm in nms ]
-    return eval( Expr( :call, name, vals... ) )
+    return eval( current_module(), Expr( :call, name, vals... ) )
 end
 
 @doc doc"""
@@ -218,7 +224,7 @@ the old value or appending a new value.
 This copies the underlying data.
 """ ->
 function setindex{V}( t::NamedTuple, key::Symbol, val::V)
-    nt = eval( make_tuple( [ Expr( :(=>), key, val  )]))
+    nt = eval( current_module(),create_tuple( [key] ))( val )
     return merge( t, nt )
 end
 
@@ -230,7 +236,7 @@ function delete( t::NamedTuple, key::Symbol )
     nms = filter( x->x!=key, fieldnames( t ) )
     name = create_tuple( nms )
     vals = [ getindex( t, nm ) for nm in nms ]
-    return eval( Expr( :call, name, vals... ) )
+    return eval(current_module(), Expr( :call, name, vals... ) )
 end
 
 export @NT, NamedTuple, setindex, delete
