@@ -1,11 +1,6 @@
 __precompile__()
 module NamedTuples
 
-if VERSION < v"0.4-"
-   using Docile
-   fieldnames = names
-end
-
 abstract NamedTuple <: Associative
 
 Base.keys( t::NamedTuple ) = fieldnames( t )
