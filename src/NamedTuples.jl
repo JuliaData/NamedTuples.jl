@@ -102,9 +102,9 @@ end
 # constructed.
 function create_tuple( fields::Vector{Symbol})
     len = length( fields )
-    name = symbol( string( "_NT_", join( fields)) )
-    types = [symbol("T$n") for n in 1:len]
-    tfields = [ Expr(:(::), symbol( fields[n] ), symbol( "T$n") ) for n in 1:len ]
+    name = Symbol( string( "_NT_", join( fields)) )
+    types = [Symbol("T$n") for n in 1:len]
+    tfields = [ Expr(:(::), Symbol( fields[n] ), Symbol( "T$n") ) for n in 1:len ]
     def = Expr(:type, false, Expr( :(<:), Expr( :curly, name, types... ), :NamedTuple ), Expr(:block, tfields...) )
     ifdef = Expr(:call, :isdefined, QuoteNode(name))
     builder = ( :(!( $ifdef ) && eval( $def ) ) )
@@ -142,7 +142,7 @@ function make_tuple( exprs::Vector)
             error( "Invalid tuple, all values must be specified during construction @ ($expr)")
         end
         construct  = val != nothing
-        fields[i]  = sym != nothing?sym:symbol( "_$(i)_")
+        fields[i]  = sym != nothing?sym:Symbol( "_$(i)_")
         typs[i] = typ
         # On construction ensure that the types are consitent with the declared types, if applicable
         values[i]  = ( typ != nothing && construct)? Expr( :call, :convert, typ, val ) : val
