@@ -27,8 +27,8 @@ Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 function Base.(:(==))( lhs::NamedTuple, rhs::NamedTuple)
     ( lhs === rhs ) && return true
     ( typeof( lhs ) != typeof( rhs )) && return false
-    for( i in 1:length( lhs ))
-        if( lhs[i] != rhs[i])
+    for i in 1:length( lhs )
+        if ( lhs[i] != rhs[i])
             return false
         end
     end
@@ -38,7 +38,7 @@ end
 
 function Base.hash( nt::NamedTuple, hs::UInt64)
     h = 17
-    for( v in values(nt) )
+    for v in values(nt)
         h = h * 23 + hash( v, hs )
     end
     return h
@@ -135,7 +135,7 @@ function make_tuple( exprs::Vector)
     # supplied by the caller, we use this state to ensure this
     construct = false
     # handle the case where this is defining a datatype
-    for( i in 1:len )
+    for i in 1:len
         expr = exprs[i]
         ( sym, typ, val ) = trans( expr )
         if( construct == true && val == nothing || ( i > 1 && construct == false && val != nothing ))
