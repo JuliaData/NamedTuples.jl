@@ -190,7 +190,7 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
     Test.foo( 1 ) # Returns a NamedTuple of 5 elements
     Test.bar( @NT( a=> 2, c=>"hello")) # Returns `hellohello`
 """ ->
-macro NT( expr::Expr... )
+macro NT( expr... )
     return make_tuple( collect( expr ))
 end
 
