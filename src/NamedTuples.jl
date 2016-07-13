@@ -8,7 +8,7 @@ Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in fieldnames( t )]
 Base.length( t::NamedTuple ) = length( fieldnames( t ))
 # Iteration
 Base.start( t::NamedTuple ) = 1
-Base.done( t::NamedTuple, iter ) = iter<length( fieldnames( NamedTuple ))
+Base.done( t::NamedTuple, iter ) = iter>length( fieldnames( t ))
 Base.next( t::NamedTuple, iter ) = ( ( fieldnames(t)[iter], getfield( t, iter )), iter += 1)
 Base.endof( t::NamedTuple ) = length( t )
 Base.last( t::NamedTuple ) = (fieldnames(t)[end], t[end] )
