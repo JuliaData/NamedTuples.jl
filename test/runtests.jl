@@ -14,7 +14,7 @@ using Base.Test
 
 @test first( @NT( a => 1, b => 2.0 )) == ( :a, 1)
 @test last( @NT( a => 1, b => "hello", c => 2.0 )) == ( :c, 2.0)
-@test [ v for( (k,v) in @NT( a => 1.0, b => 2.0 ) ) ] == [ 1.0, 2.0 ]
+@test [ v for (k,v) in @NT( a => 1.0, b => 2.0 ) ] == [ 1.0, 2.0 ]
 
 @test ( x = @NT( a::Int64, b::Float64 )( 1, 2.0 ) ; typeof(x.a) == Int64 && typeof(x.b) == Float64 )
 @test @NT( a => 1, b => "hello")  ==  @NT( a, b )( 1, "hello")
