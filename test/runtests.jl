@@ -12,9 +12,9 @@ using Base.Test
 @test length( @NT( a => 1)) == 1
 @test length( @NT( a => 1, b => 2.0)) == 2
 
-@test first( @NT( a => 1, b => 2.0 )) == ( :a, 1)
-@test last( @NT( a => 1, b => "hello", c => 2.0 )) == ( :c, 2.0)
-@test [ v for (k,v) in @NT( a => 1.0, b => 2.0 ) ] == [ 1.0, 2.0 ]
+@test first( @NT( a => 1, b => 2.0 )) == 1
+@test last( @NT( a => 1, b => "hello", c => 2.0 )) == 2.0
+@test [ v for v in @NT( a => 1.0, b => 2.0 ) ] == [ 1.0, 2.0 ]
 
 @test ( x = @NT( a::Int64, b::Float64 )( 1, 2.0 ) ; typeof(x.a) == Int64 && typeof(x.b) == Float64 )
 @test @NT( a => 1, b => "hello")  ==  @NT( a, b )( 1, "hello")
@@ -47,6 +47,7 @@ x = setindex( nt, :x, 123 )
 @test x.a == 1
 @test x.b == 2
 @test x.c == 3
+@test nt[[:c,:b]] == @NT( c=>3, b=>2 )
 
 y = delete( x, :a)
 @test x != y
