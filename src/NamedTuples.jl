@@ -23,7 +23,7 @@ Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default)
 Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 # Deep compare
 
-function Base.:(==)( lhs::NamedTuple, rhs::NamedTuple)
+function Base.(:(==))( lhs::NamedTuple, rhs::NamedTuple)
     ( lhs === rhs ) && return true
     ( typeof( lhs ) != typeof( rhs )) && return false
     for i in 1:length( lhs )
@@ -184,13 +184,20 @@ macro NT( expr... )
     return make_tuple( collect( expr ))
 end
 
+# Helper function for 0.4 compat
+if VERSION < v"0.5.0" 
+    getfieldname( t, i ) = fieldnames(t)[i]
+else
+    getfieldname( t, i ) = fieldname( r, i )
+end
+
 @doc doc"""
 Create a slice of an existing NamedTuple using a UnitRange. Construct a new NamedTuple with
 the result.
 This copies the underlying data.
 """ ->
 function Base.slice( t::NamedTuple, rng::AbstractVector )
-    names = unique( Symbol[ isa(i,Symbol) ? i : fieldname(typeof(t),i) for i in rng ] )
+    names = unique( Symbol[ isa(i,Symbol) ? i : getfieldname(typeof(t),i) for i in rng ] )
     name = create_tuple( names )
     getfield(NamedTuples,name)([ getfield( t, i ) for i in names ]...)
 end
