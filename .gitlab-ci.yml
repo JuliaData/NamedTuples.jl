@@ -1,0 +1,8 @@
+image: blade-registry1.blackrock.com:5043/blade/docker-blade-julia_ubuntu_trusty:latest
+
+before_script:
+  - bash --login -c '/opt/julia/bin/julia -v'
+  
+test:
+  script:
+    - bash --login -c '/opt/julia/bin/julia /usr/local/bin/julia-test-runner.jl external NamedTuples'

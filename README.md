@@ -47,8 +47,8 @@ NamedTuples support iteration and indexing, and behave as immutable associative 
     @NT( a => 1 )[:a] == 1
     length( @NT( a => 1)) == 1
     length( @NT( a => 1, b => 2.0)) == 2
-    first( @NT( a => 1, b => 2.0 )) == ( :a, 1)
-    last( @NT( a => 1, b => 2.0 )) == ( :b, 2.0)
+    first( @NT( a => 1, b => 2.0 )) ==  1
+    last( @NT( a => 1, b => 2.0 )) == 2.0
     for( (k,v) in @NT( a => 1, b => 1 ))
         prinln( "$k => $v")
     end
