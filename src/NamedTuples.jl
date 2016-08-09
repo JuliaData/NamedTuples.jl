@@ -188,7 +188,7 @@ end
 if VERSION < v"0.5.0" 
     getfieldname( t, i ) = fieldnames(t)[i]
 else
-    getfieldname( t, i ) = fieldname( r, i )
+    getfieldname( t, i ) = fieldname( t, i )
 end
 
 @doc doc"""
