@@ -1,6 +1,3 @@
-tags:
-    - docker
-
 image: blade-calc1.blackrock.com:5043/blade/docker-blade-julia_ubuntu_trusty:latest
 
 before_script:
