@@ -23,7 +23,9 @@ Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default)
 Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 # Deep compare
 
-function Base.(:(==))( lhs::NamedTuple, rhs::NamedTuple)
+import Base: ==
+
+function ==( lhs::NamedTuple, rhs::NamedTuple)
     ( lhs === rhs ) && return true
     ( typeof( lhs ) != typeof( rhs )) && return false
     for i in 1:length( lhs )
