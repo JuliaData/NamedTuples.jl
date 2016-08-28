@@ -17,7 +17,7 @@ function Base.show( io::IO, t::NamedTuple )
     first = true
     for (k,v) in zip(keys(t),values(t))
         !first && print(io, ", ")
-        print(io, k, " => "); show(io, v)
+        print(io, k, " = "); show(io, v)
         first = false
     end
     print(io, ")")
@@ -68,6 +68,12 @@ escape( e::Symbol ) = esc( e )
 escape( e ) = e
 
 function trans( ::Type{ParseNode{:(=>)}}, expr::Expr)
+    Base.depwarn("\"=>\" syntax for NamedTuple construction is deprecated, use \"=\" instead.", Symbol("@NT"))
+    (sym, typ ) = trans( expr.args[1])
+    return (sym, typ, escape( expr.args[2] ))
+end
+
+function trans( ::Type{ParseNode{:kw}}, expr::Expr)
     (sym, typ ) = trans( expr.args[1])
     return (sym, typ, escape( expr.args[2] ))
 end
@@ -169,7 +175,7 @@ Syntax
 
     @NT( a, b )                 -> Defines a tuple with a and b as members
     @NT( a::Int64, b::Float64 ) -> Defines a tuple with the specific arg types as members
-    @NT( a => 1, b => "hello")  -> Defines and constructs a tuple with the specifed members and values
+    @NT( a = 1, b = "hello")  -> Defines and constructs a tuple with the specifed members and values
     @NT( a, b )( 1, "hello")    -> Is equivalent to the above definition
     @NT( a::Int64 )( 2.0 )      -> Calls `convert( Int64, 2.0 )` on construction and sets `a`
 
@@ -181,7 +187,7 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
     function foo( y )
         a = 1
         x = 3
-        return  @NT( a => 1, b => "world", c => "hello", d=>a/x, y => a/y  )
+        return  @NT( a = 1, b = "world", c = "hello", d=a/x, y = a/y  )
     end
     function bar( nt::@NT( a::Int64, c::ASCIIString ))
         return repeat( nt.c, nt.a )
@@ -190,7 +196,7 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
     end
 
     Test.foo( 1 ) # Returns a NamedTuple of 5 elements
-    Test.bar( @NT( a=> 2, c=>"hello")) # Returns `hellohello`
+    Test.bar( @NT( a= 2, c="hello")) # Returns `hellohello`
 """ ->
 macro NT( expr... )
     return make_tuple( collect( expr ))
