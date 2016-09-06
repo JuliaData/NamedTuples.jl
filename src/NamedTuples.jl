@@ -96,7 +96,8 @@ end
 # this is only done if the tuple has not already been
 # constructed.
 function create_tuple( fields::Vector{Symbol})
-    name = Symbol( string( "_NT_", join( fields)) )
+    escaped_fieldnames = [replace(string(i), "_", "__") for i in fields]
+    name = Symbol( string( "_NT_", join( escaped_fieldnames, "_")) )
     if !isdefined(NamedTuples, name)
         len = length( fields )
         types = [Symbol("T$n") for n in 1:len]
