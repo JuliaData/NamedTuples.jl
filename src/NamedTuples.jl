@@ -12,7 +12,16 @@ Base.done( t::NamedTuple, iter ) = iter>length( fieldnames( t ))
 Base.next( t::NamedTuple, iter ) = ( getfield( t, iter ), iter + 1 )
 Base.endof( t::NamedTuple ) = length( t )
 Base.last( t::NamedTuple ) = t[end]
-Base.show( io::IO,t::NamedTuple) = print( io, "(", join([ "$k => $v" for (k,v) in zip(keys(t),values(t)) ], ", ") ,")")
+function Base.show( io::IO, t::NamedTuple )
+    print(io, "(")
+    first = true
+    for (k,v) in zip(keys(t),values(t))
+        !first && print(io, ", ")
+        print(io, k, " => "); show(io, v)
+        first = false
+    end
+    print(io, ")")
+end
 # Make this indexable so that it works like a Tuple
 Base.getindex( t::NamedTuple, i::Int ) = getfield( t, i )
 Base.getindex( t::NamedTuple, i::AbstractVector) = slice( t, i )
@@ -23,7 +32,9 @@ Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default)
 Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 # Deep compare
 
-function Base.(:(==))( lhs::NamedTuple, rhs::NamedTuple)
+import Base: ==
+
+function ==( lhs::NamedTuple, rhs::NamedTuple)
     ( lhs === rhs ) && return true
     ( typeof( lhs ) != typeof( rhs )) && return false
     for i in 1:length( lhs )
