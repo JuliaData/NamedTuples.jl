@@ -1,14 +1,17 @@
 __precompile__()
 module NamedTuples
 
-abstract NamedTuple <: Associative
+using Compat
+
+@compat abstract type NamedTuple end
 
 Base.keys( t::NamedTuple ) = fieldnames( t )
-Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in fieldnames( t )]
-Base.length( t::NamedTuple ) = length( fieldnames( t ))
+Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in 1:nfields( t ) ]
+Base.haskey( t::NamedTuple, k ) = k in keys(t)
+Base.length( t::NamedTuple ) = nfields( t )
 # Iteration
 Base.start( t::NamedTuple ) = 1
-Base.done( t::NamedTuple, iter ) = iter>length( fieldnames( t ))
+Base.done( t::NamedTuple, iter ) = iter > nfields( t )
 Base.next( t::NamedTuple, iter ) = ( getfield( t, iter ), iter + 1 )
 Base.endof( t::NamedTuple ) = length( t )
 Base.last( t::NamedTuple ) = t[end]
@@ -24,10 +27,9 @@ function Base.show( io::IO, t::NamedTuple )
 end
 # Make this indexable so that it works like a Tuple
 Base.getindex( t::NamedTuple, i::Int ) = getfield( t, i )
-Base.getindex( t::NamedTuple, i::AbstractVector) = slice( t, i )
 # We also support indexing by symbol
 Base.getindex( t::NamedTuple, i::Symbol ) = getfield( t, i )
-Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default)
+Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default )
 # This is a linear lookup...
 Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 # Deep compare
@@ -67,15 +69,18 @@ escape( e::Expr ) = esc( e )
 escape( e::Symbol ) = esc( e )
 escape( e ) = e
 
-function trans( ::Type{ParseNode{:(=>)}}, expr::Expr)
-    Base.depwarn("\"=>\" syntax for NamedTuple construction is deprecated, use \"=\" instead.", Symbol("@NT"))
+function trans( ::Union{Type{ParseNode{:(=)}},Type{ParseNode{:kw}}}, expr::Expr)
     (sym, typ ) = trans( expr.args[1])
     return (sym, typ, escape( expr.args[2] ))
 end
 
-function trans( ::Type{ParseNode{:kw}}, expr::Expr)
-    (sym, typ ) = trans( expr.args[1])
-    return (sym, typ, escape( expr.args[2] ))
+function trans( ::Type{ParseNode{:call}}, expr::Expr)
+    if expr.args[1] == :(=>)
+        Base.depwarn("\"=>\" syntax for NamedTuple construction is deprecated, use \"=\" instead.", Symbol("@NT"))
+        (sym, typ ) = trans( expr.args[1])
+        return (sym, typ, escape( expr.args[2] ))
+    end
+    return (nothing, nothing, escape(expr) )
 end
 
 # Allow unary
@@ -108,6 +113,47 @@ function trans{T}( ::Type{ParseNode{T}}, expr::Expr)
     return (nothing, nothing, escape(expr) )
 end
 
+function gen_namedtuple_ctor_body(n::Int, args)
+    types = [ :(typeof($x)) for x in args ]
+    cnvt = [ :(convert(fieldtype(TT,$n),$(args[n]))) for n = 1:n ]
+    if n == 0
+        texpr = :T
+    else
+        texpr = :(NT{$(types...)})
+    end
+    if isless(Base.VERSION, v"0.6.0-")
+        tcond = :(NT === NT.name.primary)
+    else
+        tcond = :(isa(NT,UnionAll))
+    end
+    quote
+        if $tcond
+            TT = $texpr
+        else
+            TT = NT
+        end
+        if nfields(TT) !== $n
+            throw(ArgumentError("wrong number of arguments to named tuple constructor"))
+        end
+        $(Expr(:new, :TT, cnvt...))
+    end
+end
+
+# constructor for all NamedTuples
+@generated function (::Type{NT}){NT<:NamedTuple}(args...)
+    n = length(args)
+    aexprs = [ :(args[$i]) for i = 1:n ]
+    return gen_namedtuple_ctor_body(n, aexprs)
+end
+
+# specialized for certain argument counts
+for n = 0:5
+    args = [ Symbol("x$n") for n = 1:n ]
+    @eval function (::Type{NT}){NT<:NamedTuple}($(args...))
+        $(gen_namedtuple_ctor_body(n, args))
+    end
+end
+
 #
 # Create a NameTuple in the context of this module
 # this is only done if the tuple has not already been
@@ -119,7 +165,9 @@ function create_tuple( fields::Vector{Symbol})
         len = length( fields )
         types = [Symbol("T$n") for n in 1:len]
         tfields = [ Expr(:(::), Symbol( fields[n] ), Symbol( "T$n") ) for n in 1:len ]
-        def = Expr(:type, false, Expr( :(<:), Expr( :curly, name, types... ), :NamedTuple ), Expr(:block, tfields...) )
+        def = Expr(:type, false, Expr( :(<:), Expr( :curly, name, types... ), :NamedTuple ),
+                   Expr(:block, tfields...,
+                        Expr(:tuple)))  # suppress default constructors
         eval(NamedTuples, def)
     end
     return name
@@ -139,9 +187,9 @@ end
 @doc doc"Given an expression vector create the `NamedTuple`" ->
 function make_tuple( exprs::Vector)
     len    = length( exprs )
-    fields = Array(Symbol, len)
-    values = Array(Any, len)
-    typs   = Array(Any, len)
+    fields = Array{Symbol}(len)
+    values = Array{Any}(len)
+    typs   = Array{Any}(len)
 
     # Are we directly constructing the type, if so all values must be
     # supplied by the caller, we use this state to ensure this
@@ -164,6 +212,9 @@ function make_tuple( exprs::Vector)
 
     # Either call the constructor with the supplied values or return the type
     if( !construct )
+        if len == 0
+            return name
+        end
         return Expr( :curly, name, typs... )
     else
         return Expr( :call, name, values ... )
@@ -209,12 +260,7 @@ else
     getfieldname( t, i ) = fieldname( t, i )
 end
 
-@doc doc"""
-Create a slice of an existing NamedTuple using a UnitRange. Construct a new NamedTuple with
-the result.
-This copies the underlying data.
-""" ->
-function Base.slice( t::NamedTuple, rng::AbstractVector )
+function Base.getindex( t::NamedTuple, rng::AbstractVector )
     names = unique( Symbol[ isa(i,Symbol) ? i : getfieldname(typeof(t),i) for i in rng ] )
     name = create_tuple( names )
     getfield(NamedTuples,name)([ getfield( t, i ) for i in names ]...)
@@ -239,7 +285,7 @@ the old value or appending a new value.
 This copies the underlying data.
 """ ->
 function setindex{V}( t::NamedTuple, key::Symbol, val::V)
-    nt = getfield( NamedTuples,create_tuple( [key] ))( val )
+    nt = getfield( NamedTuples, create_tuple( [key] ))( val )
     return merge( t, nt )
 end
 
