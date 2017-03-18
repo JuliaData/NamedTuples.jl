@@ -1,9 +1,7 @@
 __precompile__()
 module NamedTuples
 
-using Compat
-
-@compat abstract type NamedTuple end
+abstract type NamedTuple end
 
 Base.keys( t::NamedTuple ) = fieldnames( t )
 Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in 1:nfields( t ) ]
