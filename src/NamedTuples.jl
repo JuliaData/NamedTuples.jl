@@ -274,7 +274,7 @@ end
     M = length(nts)
 
     NT = create_tuple(fields) # This type will already exist if this function may be called
-    args = Expr[:(f($(Expr[:(nts[$i][$j]) for i = 1:M]...))) for j = 1:N]
+    args = Expr[:(f($(Expr[:(getfield(nts[$i], $j)) for i = 1:M]...))) for j = 1:N]
     quote
         NamedTuples.$NT($(args...))
     end
