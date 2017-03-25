@@ -58,4 +58,10 @@ y = delete( x, :a)
 @test x.b == 2
 @test x.c == 3
 
+@test map(-, @NT(x=1, y=2)) == @NT(x=-1, y=-2)
+@test map(+, @NT(x=1, y=2), @NT(x=1, y=2)) == @NT(x=2, y=4)
+@test_throws ArgumentError map(+, @NT(x=1, y=2), @NT(y=1, x=2))
+@test map(string, @NT(x=1, y=2)) == @NT(x="1", y="2")
+@test map(round, @NT(x=1//3, y=Int), @NT(x=3, y=2//3)) == @NT(x=0.333, y=1)
+
 @test merge( nt, @NT( d = "hello", e = "world"))  == @NT( a=1,b=2,c=3,d="hello",e="world")

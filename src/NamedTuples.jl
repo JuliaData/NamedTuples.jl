@@ -258,6 +258,28 @@ else
     getfieldname( t, i ) = fieldname( t, i )
 end
 
+@inline function Base.map(f, nt::NamedTuple, nts::NamedTuple...)
+    # this method makes sure we don't define a map(f) method
+    _map(f, nt, nts...)
+end
+
+@generated function _map(f, nts::NamedTuple...)
+    fields = fieldnames(nts[1])
+    for x in nts[2:end]
+        if !isequal(fieldnames(x), fields)
+            throw(ArgumentError("All NamedTuple inputs to map must have the same fields in the same order"))
+        end
+    end
+    N = nfields(nts[1])
+    M = length(nts)
+
+    NT = create_tuple(fields) # This type will already exist if this function may be called
+    args = Expr[:(f($(Expr[:(nts[$i][$j]) for i = 1:M]...))) for j = 1:N]
+    quote
+        NamedTuples.$NT($(args...))
+    end
+end
+
 function Base.getindex( t::NamedTuple, rng::AbstractVector )
     names = unique( Symbol[ isa(i,Symbol) ? i : getfieldname(typeof(t),i) for i in rng ] )
     name = create_tuple( names )
