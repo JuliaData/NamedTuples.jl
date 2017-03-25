@@ -24,10 +24,9 @@ function Base.show( io::IO, t::NamedTuple )
 end
 # Make this indexable so that it works like a Tuple
 Base.getindex( t::NamedTuple, i::Int ) = getfield( t, i )
-Base.getindex( t::NamedTuple, i::AbstractVector) = slice( t, i )
 # We also support indexing by symbol
 Base.getindex( t::NamedTuple, i::Symbol ) = getfield( t, i )
-Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default)
+Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default )
 # This is a linear lookup...
 Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 # Deep compare
@@ -209,12 +208,29 @@ else
     getfieldname( t, i ) = fieldname( t, i )
 end
 
-@doc doc"""
-Create a slice of an existing NamedTuple using a UnitRange. Construct a new NamedTuple with
-the result.
-This copies the underlying data.
-""" ->
-function Base.slice( t::NamedTuple, rng::AbstractVector )
+@inline function Base.map(f, nt::NamedTuple, nts::NamedTuple...)
+    # this method makes sure we don't define a map(f) method
+    _map(f, nt, nts...)
+end
+
+@generated function _map(f, nts::NamedTuple...)
+    fields = fieldnames(nts[1])
+    for x in nts[2:end]
+        if !isequal(fieldnames(x), fields)
+            throw(ArgumentError("All NamedTuple inputs to map must have the same fields in the same order"))
+        end
+    end
+    N = nfields(nts[1])
+    M = length(nts)
+
+    NT = create_tuple(fields) # This type will already exist if this function may be called
+    args = Expr[:(f($(Expr[:(nts[$i][$j]) for i = 1:M]...))) for j = 1:N]
+    quote
+        NamedTuples.$NT($(args...))
+    end
+end
+
+function Base.getindex( t::NamedTuple, rng::AbstractVector )
     names = unique( Symbol[ isa(i,Symbol) ? i : getfieldname(typeof(t),i) for i in rng ] )
     name = create_tuple( names )
     getfield(NamedTuples,name)([ getfield( t, i ) for i in names ]...)
