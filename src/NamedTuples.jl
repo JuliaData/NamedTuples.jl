@@ -319,6 +319,13 @@ function delete( t::NamedTuple, key::Symbol )
     return getfield(NamedTuples, name)(vals...)
 end
 
+Base.Broadcast._containertype(::Type{<:NamedTuple}) = NamedTuple
+Base.Broadcast.promote_containertype(::Type{NamedTuple}, ::Type{NamedTuple}) = NamedTuple
+
+@inline function Base.Broadcast.broadcast_c(f, ::Type{NamedTuple}, nts...)
+    _map(f, nts...)
+end
+
 export @NT, NamedTuple, setindex, delete
 
 end # module
