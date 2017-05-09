@@ -66,3 +66,5 @@ implementation of these operations is functional rather than performance oriente
 Note the use of `setindex/delete` and not `setindex!/delete!` as these operations do NOT modify in place.
 
 [![Build Status](https://travis-ci.org/blackrock/NamedTuples.jl.svg?branch=master)](https://travis-ci.org/blackrock/NamedTuples.jl)
+[![NamedTuples](http://pkg.julialang.org/badges/NamedTuples_0.6.svg)](http://pkg.julialang.org/?pkg=NamedTuples)
+[![codecov.io](http://codecov.io/github/blackrock/NamedTuples.jl/coverage.svg?branch=master)](http://codecov.io/github/blackrock/NamedTuples.jl?branch=master)
