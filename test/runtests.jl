@@ -64,4 +64,7 @@ y = delete( x, :a)
 @test map(string, @NT(x=1, y=2)) == @NT(x="1", y="2")
 @test map(round, @NT(x=1//3, y=Int), @NT(x=3, y=2//3)) == @NT(x=0.333, y=1)
 
+@test @NT(x=1, y=2) <  @NT(x=1, y=2.5)
+@test @NT(x=1, y=2) >= @NT(x=1, y=2.0)
+
 @test merge( nt, @NT( d = "hello", e = "world"))  == @NT( a=1,b=2,c=3,d="hello",e="world")
