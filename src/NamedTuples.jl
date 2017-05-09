@@ -321,6 +321,8 @@ end
 
 Base.Broadcast._containertype(::Type{<:NamedTuple}) = NamedTuple
 Base.Broadcast.promote_containertype(::Type{NamedTuple}, ::Type{NamedTuple}) = NamedTuple
+Base.Broadcast.promote_containertype(::Type{NamedTuple}, _) = error()
+Base.Broadcast.promote_containertype(_, ::Type{NamedTuple}) = error()
 
 @inline function Base.Broadcast.broadcast_c(f, ::Type{NamedTuple}, nts...)
     _map(f, nts...)
