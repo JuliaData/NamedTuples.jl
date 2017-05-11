@@ -1,5 +1,6 @@
 __precompile__()
 module NamedTuples
+__init__() = __precompile__(false)
 
 abstract type NamedTuple end
 
