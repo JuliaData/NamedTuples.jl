@@ -65,4 +65,7 @@ implementation of these operations is functional rather than performance oriente
 
 Note the use of `setindex/delete` and not `setindex!/delete!` as these operations do NOT modify in place.
 
+
+Warning: Currently, it is not possible to use NameTuples within precompiled packages.
+
 [![Build Status](https://travis-ci.org/blackrock/NamedTuples.jl.svg?branch=master)](https://travis-ci.org/blackrock/NamedTuples.jl)
