@@ -65,3 +65,7 @@ y = delete( x, :a)
 @test map(round, @NT(x=1//3, y=Int), @NT(x=3, y=2//3)) == @NT(x=0.333, y=1)
 
 @test merge( nt, @NT( d = "hello", e = "world"))  == @NT( a=1,b=2,c=3,d="hello",e="world")
+
+@test get.(@NT( a = Nullable(3), b = Nullable("world") )) == @NT( a = 3, b = "world")
+@test_throws MethodError @NT( a = 3) .+ [4]
+@test_throws MethodError [4] .+ @NT( a = 3)
