@@ -280,6 +280,22 @@ end
     end
 end
 
+@generated function Base.isless(t1::NamedTuple, t2::NamedTuple)
+    if !isequal(fieldnames(t1), fieldnames(t2))
+        throw(ArgumentError("NamedTuple inputs to isless must have the same fields in the same order"))
+    end
+    quote
+        Base.@nexprs $(nfields(t1)) i -> begin
+            a_i = getfield(t1, i)
+            b_i = getfield(t2, i)
+            if !isequal(a_i, b_i)
+                return isless(a_i, b_i)
+            end
+        end
+        return false
+    end
+end
+
 function Base.getindex( t::NamedTuple, rng::AbstractVector )
     names = unique( Symbol[ isa(i,Symbol) ? i : getfieldname(typeof(t),i) for i in rng ] )
     name = create_tuple( names )
