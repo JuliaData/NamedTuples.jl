@@ -307,12 +307,23 @@ Merge two NamedTuples favoring the lhs
 Order is preserved lhs names come first.
 This copies the underlying data.
 """ ->
-function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
-    nms = unique( vcat( fieldnames( lhs ), fieldnames( rhs )) )
-    name = create_tuple( nms )
-    # FIXME should handle the type only case
-    vals = [ haskey( lhs, nm ) ? lhs[nm] : rhs[nm] for nm in nms ]
-    getfield(NamedTuples,name)(vals...)
+@generated function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
+    field_assignments = Expr[]
+    names_from_left = Set{Symbol}()
+    for i in fieldnames(lhs)
+        push!(field_assignments, Expr(:(=), i, Expr(:., :lhs, QuoteNode(i))))
+        push!(names_from_left, i)
+    end
+
+    for i in fieldnames(rhs)
+        if !(i in names_from_left)
+            push!(field_assignments, Expr(:(=), i, Expr(:., :rhs, QuoteNode(i))))
+        end
+    end
+
+    constructor_call = Expr(:macrocall, Symbol("@NT"), field_assignments...)
+
+    return constructor_call
 end
 
 @doc doc"""
