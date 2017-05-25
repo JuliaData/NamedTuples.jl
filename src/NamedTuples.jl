@@ -1,6 +1,8 @@
 __precompile__()
 module NamedTuples
 
+export @NT, NamedTuple, setindex, delete
+
 abstract type NamedTuple end
 
 Base.keys( t::NamedTuple ) = fieldnames( t )
@@ -152,23 +154,22 @@ for n = 0:5
     end
 end
 
-#
-# Create a NameTuple in the context of this module
-# this is only done if the tuple has not already been
-# constructed.
-function create_tuple( fields::Vector{Symbol})
+# Create a NameTuple type, if a type with these field names has not already
+# been constructed.
+# TODO: to make modules containing named tuples precompile-able, change `= NamedTuples` to `= current_module()`
+function create_namedtuple_type(fields::Vector{Symbol}, mod::Module = NamedTuples)
     escaped_fieldnames = [replace(string(i), "_", "__") for i in fields]
     name = Symbol( string( "_NT_", join( escaped_fieldnames, "_")) )
-    if !isdefined(NamedTuples, name)
+    if !isdefined(mod, name)
         len = length( fields )
         types = [Symbol("T$n") for n in 1:len]
         tfields = [ Expr(:(::), Symbol( fields[n] ), Symbol( "T$n") ) for n in 1:len ]
-        def = Expr(:type, false, Expr( :(<:), Expr( :curly, name, types... ), :NamedTuple ),
+        def = Expr(:type, false, Expr( :(<:), Expr( :curly, name, types... ), GlobalRef(NamedTuples, :NamedTuple) ),
                    Expr(:block, tfields...,
                         Expr(:tuple)))  # suppress default constructors
-        eval(NamedTuples, def)
+        eval(mod, def)
     end
-    return name
+    return getfield(mod, name)
 end
 
 #
@@ -176,7 +177,7 @@ end
 #
 @doc doc"Given a symbol vector create the `NamedTuple`" ->
 function make_tuple( syms::Vector{Symbol} )
-    return create_tuple( syms )
+    return create_namedtuple_type( syms )
 end
 
 #
@@ -206,16 +207,16 @@ function make_tuple( exprs::Vector)
         values[i]  = ( typ != nothing && construct)? Expr( :call, :convert, typ, val ) : val
     end
 
-    name = create_tuple( fields )
+    ty = create_namedtuple_type( fields )
 
     # Either call the constructor with the supplied values or return the type
     if( !construct )
         if len == 0
-            return name
+            return ty
         end
-        return Expr( :curly, name, typs... )
+        return Expr( :curly, ty, typs... )
     else
-        return Expr( :call, name, values ... )
+        return Expr( :call, ty, values ... )
     end
 end
 
@@ -273,10 +274,11 @@ end
     N = nfields(nts[1])
     M = length(nts)
 
-    NT = create_tuple(fields) # This type will already exist if this function may be called
+    # This type will already exist if this function may be called
+    NT = create_namedtuple_type(fields, moduleof(nts[1]))
     args = Expr[:(f($(Expr[:(getfield(nts[$i], $j)) for i = 1:M]...))) for j = 1:N]
     quote
-        NamedTuples.$NT($(args...))
+        $NT($(args...))
     end
 end
 
@@ -298,8 +300,8 @@ end
 
 function Base.getindex( t::NamedTuple, rng::AbstractVector )
     names = unique( Symbol[ isa(i,Symbol) ? i : getfieldname(typeof(t),i) for i in rng ] )
-    name = create_tuple( names )
-    getfield(NamedTuples,name)([ getfield( t, i ) for i in names ]...)
+    ty = create_namedtuple_type( names )
+    ty([ getfield( t, i ) for i in names ]...)
 end
 
 @doc doc"""
@@ -309,10 +311,10 @@ This copies the underlying data.
 """ ->
 function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
     nms = unique( vcat( fieldnames( lhs ), fieldnames( rhs )) )
-    name = create_tuple( nms )
+    ty = create_namedtuple_type( nms )
     # FIXME should handle the type only case
     vals = [ haskey( lhs, nm ) ? lhs[nm] : rhs[nm] for nm in nms ]
-    getfield(NamedTuples,name)(vals...)
+    ty(vals...)
 end
 
 @doc doc"""
@@ -321,7 +323,7 @@ the old value or appending a new value.
 This copies the underlying data.
 """ ->
 function setindex{V}( t::NamedTuple, key::Symbol, val::V)
-    nt = getfield( NamedTuples, create_tuple( [key] ))( val )
+    nt = create_namedtuple_type( [key] )( val )
     return merge( t, nt )
 end
 
@@ -330,9 +332,9 @@ Create a new NamedTuple with the specified element removed.
 """ ->
 function delete( t::NamedTuple, key::Symbol )
     nms = filter( x->x!=key, fieldnames( t ) )
-    name = create_tuple( nms )
+    ty = create_namedtuple_type( nms )
     vals = [ getindex( t, nm ) for nm in nms ]
-    return getfield(NamedTuples, name)(vals...)
+    return ty(vals...)
 end
 
 Base.Broadcast._containertype(::Type{<:NamedTuple}) = NamedTuple
@@ -344,6 +346,81 @@ Base.Broadcast.promote_containertype(_, ::Type{NamedTuple}) = error()
     _map(f, nts...)
 end
 
-export @NT, NamedTuple, setindex, delete
+moduleof(t::DataType) = t.name.module
+
+if VERSION < v"0.6.0-dev"
+    uniontypes(u) = u.types
+else
+    const uniontypes = Base.uniontypes
+    moduleof(t::UnionAll) = moduleof(Base.unwrap_unionall(t))
+end
+
+immutable NTType end
+immutable NTVal end
+
+function Base.serialize{NT<:NamedTuple}(io::AbstractSerializer, ::Type{NT})
+    if isa(NT, Union)
+        Base.serialize_type(io, NTType)
+        serialize(io, Union)
+        serialize(io, [uniontypes(NT)...])
+    elseif isleaftype(NT)
+        Base.serialize_type(io, NTType)
+        serialize(io, fieldnames(NT))
+        serialize(io, moduleof(NT))
+        write(io.io, UInt8(0))
+        serialize(io, NT.parameters)
+    else
+        u = Base.unwrap_unionall(NT)
+        if isa(u, DataType) && NT === u.name.wrapper
+            Base.serialize_type(io, NTType)
+            serialize(io, fieldnames(NT))
+            serialize(io, moduleof(NT))
+            write(io.io, UInt8(1))
+        else
+            error("cannot serialize type $NT")
+        end
+    end
+end
+
+function Base.deserialize(io::AbstractSerializer, ::Type{NTType})
+    fnames = deserialize(io)
+    if fnames == Union
+        types = deserialize(io)
+        return Union{types...}
+    else
+        mod = deserialize(io)
+        NT = create_namedtuple_type(fnames, mod)
+        if read(io.io, UInt8) == 0
+            params = deserialize(io)
+            return NT{params...}
+        else
+            return NT
+        end
+    end
+end
+
+function Base.serialize(io::AbstractSerializer, x::NamedTuple)
+    Base.serialize_type(io, NTVal)
+    serialize(io, typeof(x))
+    for i in 1:nfields(x)
+        serialize(io, getfield(x, i))
+    end
+end
+
+function Base.deserialize(io::AbstractSerializer, ::Type{NTVal})
+    NT = deserialize(io)
+    nf = nfields(NT)
+    if nf == 0
+        return NT()
+    elseif nf == 1
+        return NT(deserialize(io))
+    elseif nf == 2
+        return NT(deserialize(io), deserialize(io))
+    elseif nf == 3
+        return NT(deserialize(io), deserialize(io), deserialize(io))
+    else
+        return NT(Any[ deserialize(io) for i = 1:nf ]...)
+    end
+end
 
 end # module

@@ -72,3 +72,12 @@ y = delete( x, :a)
 @test get.(@NT( a = Nullable(3), b = Nullable("world") )) == @NT( a = 3, b = "world")
 @test_throws MethodError @NT( a = 3) .+ [4]
 @test_throws MethodError [4] .+ @NT( a = 3)
+
+# serialize and deserialize
+addprocs(1)
+@everywhere using NamedTuples
+x = @NT(a=1, b=2)
+y = @fetchfrom 2 identity(x)
+@test isa(y,NamedTuple)
+@test y.a == 1
+@test y.b == 2
