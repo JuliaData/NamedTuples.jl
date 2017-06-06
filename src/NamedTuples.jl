@@ -36,15 +36,20 @@ Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 
 import Base: ==
 
-function ==( lhs::NamedTuple, rhs::NamedTuple)
-    ( lhs === rhs ) && return true
-    ( typeof( lhs ) != typeof( rhs )) && return false
-    for i in 1:length( lhs )
-        if ( lhs[i] != rhs[i])
-            return false
-        end
+@generated function ==( lhs::NamedTuple, rhs::NamedTuple)
+    if !isequal(fieldnames(lhs), fieldnames(rhs))
+        return false
     end
-    return true
+
+    quote
+        ( lhs === rhs ) && return true
+        for i in 1:length( lhs )
+            if ( lhs[i] != rhs[i])
+                return false
+            end
+        end
+        return true
+    end
 end
 # Deep hash
 
@@ -58,7 +63,7 @@ end
 
 
 # Helper type, for transforming parse tree to NameTuple definition
-immutable ParseNode{T} end
+struct ParseNode{T} end
 
 function trans( ::Type{ParseNode{:Symbol}}, expr::Expr)
     (expr.args[1],nothing,nothing)
@@ -355,8 +360,8 @@ else
     moduleof(t::UnionAll) = moduleof(Base.unwrap_unionall(t))
 end
 
-immutable NTType end
-immutable NTVal end
+struct NTType end
+struct NTVal end
 
 function Base.serialize{NT<:NamedTuple}(io::AbstractSerializer, ::Type{NT})
     if isa(NT, Union)
