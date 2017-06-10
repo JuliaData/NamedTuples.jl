@@ -359,7 +359,9 @@ immutable NTType end
 immutable NTVal end
 
 function Base.serialize{NT<:NamedTuple}(io::AbstractSerializer, ::Type{NT})
-    if isa(NT, Union)
+    if NT === Union{}
+        Base.Serializer.write_as_tag(io, Base.Serializer.BOTTOM_TAG)
+    elseif isa(NT, Union)
         Base.serialize_type(io, NTType)
         serialize(io, Union)
         serialize(io, [uniontypes(NT)...])

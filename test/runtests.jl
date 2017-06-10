@@ -81,3 +81,7 @@ y = @fetchfrom 2 identity(x)
 @test isa(y,NamedTuple)
 @test y.a == 1
 @test y.b == 2
+
+io = IOBuffer()
+serialize(io, Union{})
+@test deserialize(seekstart(io)) === Union{}
