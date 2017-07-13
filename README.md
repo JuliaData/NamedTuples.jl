@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/blackrock/NamedTuples.jl.svg?branch=master)](https://travis-ci.org/blackrock/NamedTuples.jl)
+
 # NamedTuples
 
 NamedTuples.jl provides a high performance implementation of named tuples for Julia (cf named tuples in python). Julia tuples are restricted to supporting index based access. This new implementation allows both index and property based access. NamedTuples may be used anywhere that a tuple is currently being used, for example in the definition of a method or as the return value of a method. NamedTuples are implemented using Julia’s macro system, ensuring that the run time cost is equivalent to constructing a regular immutable type.
