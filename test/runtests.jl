@@ -85,3 +85,8 @@ y = @fetchfrom 2 identity(x)
 io = IOBuffer()
 serialize(io, Union{})
 @test deserialize(seekstart(io)) === Union{}
+
+# allow custom types
+struct Empty end
+nt = @NT(a::Empty, b::Int)
+@test nt.parameters[1] == Empty

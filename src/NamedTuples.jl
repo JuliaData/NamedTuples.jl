@@ -69,23 +69,18 @@ function trans( ::Type{ParseNode{:Symbol}}, expr::Expr)
     (expr.args[1],nothing,nothing)
 end
 
-# Only escape items that need to be escaped.
-escape( e::Expr ) = esc( e )
-escape( e::Symbol ) = esc( e )
-escape( e ) = e
-
 function trans( ::Union{Type{ParseNode{:(=)}},Type{ParseNode{:kw}}}, expr::Expr)
     (sym, typ ) = trans( expr.args[1])
-    return (sym, typ, escape( expr.args[2] ))
+    return (sym, typ, expr.args[2] )
 end
 
 function trans( ::Type{ParseNode{:call}}, expr::Expr)
     if expr.args[1] == :(=>)
         Base.depwarn("\"=>\" syntax for NamedTuple construction is deprecated, use \"=\" instead.", Symbol("@NT"))
         (sym, typ ) = trans( expr.args[1])
-        return (sym, typ, escape( expr.args[2] ))
+        return (sym, typ, expr.args[2] )
     end
-    return (nothing, nothing, escape(expr) )
+    return (nothing, nothing, expr)
 end
 
 # Allow unary
@@ -111,11 +106,11 @@ end
 
 # Literal nodes
 function trans{T}( lit::T )
-    return (nothing, nothing, escape(lit) )
+    return (nothing, nothing, lit)
 end
 
 function trans{T}( ::Type{ParseNode{T}}, expr::Expr)
-    return (nothing, nothing, escape(expr) )
+    return (nothing, nothing, expr)
 end
 
 function gen_namedtuple_ctor_body(n::Int, args)
@@ -254,7 +249,7 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
     Test.bar( @NT( a= 2, c="hello")) # Returns `hellohello`
 """ ->
 macro NT( expr... )
-    return make_tuple( collect( expr ))
+    return esc(make_tuple( collect( expr )))
 end
 
 # Helper function for 0.4 compat
