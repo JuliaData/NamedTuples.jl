@@ -157,7 +157,7 @@ end
 # Create a NameTuple type, if a type with these field names has not already
 # been constructed.
 # TODO: to make modules containing named tuples precompile-able, change `= NamedTuples` to `= current_module()`
-function create_namedtuple_type(fields::Vector{Symbol}, mod::Module = NamedTuples)
+function create_namedtuple_type(fields::Vector{Symbol}, mod::Module = current_module())
     escaped_fieldnames = [replace(string(i), "_", "__") for i in fields]
     name = Symbol( string( "_NT_", join( escaped_fieldnames, "_")) )
     if !isdefined(mod, name)
