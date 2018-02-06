@@ -33,32 +33,33 @@ Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default )
 # This is a linear lookup...
 Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 # Deep compare
-
 import Base: ==
 
 @generated function ==( lhs::NamedTuple, rhs::NamedTuple)
-    if !isequal(fieldnames(lhs), fieldnames(rhs))
+    if !isequal(fieldnames(lhs), fieldnames(rhs)) || lhs !== rhs
         return false
     end
 
-    quote
-        ( lhs === rhs ) && return true
-        for i in 1:length( lhs )
-            if ( lhs[i] != rhs[i])
-                return false
-            end
-        end
-        return true
+    q = quote end
+    
+    for i in 1:length( fieldnames(lhs) )
+        push!(q.args, :(lhs[$(i)] == rhs[$(i)] || return false))
     end
-end
-# Deep hash
 
-function Base.hash( nt::NamedTuple, hs::UInt64)
-    h = 17
-    for v in values(nt)
-        h = h * 23 + hash( v, hs )
+    return q 
+end
+
+# Deep hash
+@generated function Base.hash(nt::NamedTuple, hs::UInt64)
+    q = quote 
+        h = 17
     end
-    return h
+
+    for i in 1:length(fieldnames(nt))
+        push!(q.args, :(h = h * 23 + hash(nt[$(i)], hs)))
+    end
+
+    return q
 end
 
 
