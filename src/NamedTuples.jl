@@ -1,9 +1,9 @@
 __precompile__()
 module NamedTuples
 
-export @NT, NamedTuple, setindex, delete
+export @NT, NamedTuple
 
-abstract type NamedTuple end
+abstract type NamedTuple{K, V<:Tuple} end
 
 Base.keys( t::NamedTuple ) = fieldnames( t )
 Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in 1:nfields( t ) ]
@@ -29,7 +29,6 @@ end
 Base.getindex( t::NamedTuple, i::Int ) = getfield( t, i )
 # We also support indexing by symbol
 Base.getindex( t::NamedTuple, i::Symbol ) = getfield( t, i )
-Base.getindex( t::NamedTuple, i::Symbol, default ) = get( t, i, default )
 # This is a linear lookup...
 Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 # Deep compare
@@ -155,6 +154,21 @@ for n = 0:5
     end
 end
 
+function create_struct_expr(name::Symbol, fields::Vector{Symbol}, mod::Module = NamedTuples)
+    len = length( fields )
+    types = [Symbol("T$n") for n in 1:len]
+    symbols = [QuoteNode(fields[n]) for n in 1:len]
+    tfields = [ Expr(:(::), Symbol( fields[n] ), Symbol( "T$n") ) for n in 1:len ]
+    abstract_type = Expr( :curly,
+                            Expr(:., :NamedTuples, Expr(:quote, :NamedTuple)),
+                            Expr(:tuple, symbols...),
+                            Expr(:curly, Symbol(Tuple), types...)
+                        )
+    Expr(:type, false, Expr( :(<:), Expr( :curly, name, types... ), abstract_type),
+               Expr(:block, tfields...,
+                    Expr(:tuple)))  # suppress default constructors
+end
+
 # Create a NameTuple type, if a type with these field names has not already
 # been constructed.
 # TODO: to make modules containing named tuples precompile-able, change `= NamedTuples` to `= current_module()`
@@ -162,16 +176,12 @@ function create_namedtuple_type(fields::Vector{Symbol}, mod::Module = NamedTuple
     escaped_fieldnames = [replace(string(i), "_", "__") for i in fields]
     name = Symbol( string( "_NT_", join( escaped_fieldnames, "_")) )
     if !isdefined(mod, name)
-        len = length( fields )
-        types = [Symbol("T$n") for n in 1:len]
-        tfields = [ Expr(:(::), Symbol( fields[n] ), Symbol( "T$n") ) for n in 1:len ]
-        def = Expr(:type, false, Expr( :(<:), Expr( :curly, name, types... ), GlobalRef(NamedTuples, :NamedTuple) ),
-                   Expr(:block, tfields...,
-                        Expr(:tuple)))  # suppress default constructors
+        def = create_struct_expr(name, fields, mod)
         eval(mod, def)
     end
     return getfield(mod, name)
 end
+
 
 #
 # Given a symbol list create the NamedTuple
@@ -299,11 +309,6 @@ end
     end
 end
 
-function Base.getindex( t::NamedTuple, rng::AbstractVector )
-    names = unique( Symbol[ isa(i,Symbol) ? i : getfieldname(typeof(t),i) for i in rng ] )
-    ty = create_namedtuple_type( names )
-    ty([ getfield( t, i ) for i in names ]...)
-end
 
 @doc doc"""
 Merge two NamedTuples favoring the lhs
@@ -316,26 +321,6 @@ function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
     # FIXME should handle the type only case
     vals = [ haskey( lhs, nm ) ? lhs[nm] : rhs[nm] for nm in nms ]
     ty(vals...)
-end
-
-@doc doc"""
-Create a new NamedTuple with the new value set on it, either overwriting
-the old value or appending a new value.
-This copies the underlying data.
-""" ->
-function setindex{V}( t::NamedTuple, key::Symbol, val::V)
-    nt = create_namedtuple_type( [key] )( val )
-    return merge( t, nt )
-end
-
-@doc doc"""
-Create a new NamedTuple with the specified element removed.
-""" ->
-function delete( t::NamedTuple, key::Symbol )
-    nms = filter( x->x!=key, fieldnames( t ) )
-    ty = create_namedtuple_type( nms )
-    vals = [ getindex( t, nm ) for nm in nms ]
-    return ty(vals...)
 end
 
 Base.Broadcast._containertype(::Type{<:NamedTuple}) = NamedTuple
@@ -426,4 +411,5 @@ function Base.deserialize(io::AbstractSerializer, ::Type{NTVal})
     end
 end
 
+include("deprecated.jl")
 end # module

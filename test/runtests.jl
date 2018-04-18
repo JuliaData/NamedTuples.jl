@@ -33,7 +33,6 @@ using Base.Test
 @test @NT( ::Int64, ::Float64 ) <: NamedTuple
 @test typeof( @NT( 1, 2, "3" )) <: NamedTuple
 @test typeof( @NT( 1 + 2, "hello")) <: NamedTuple
-@test length( @NT( 1, 2, 3, "hello")[ 1:2 ]) == 2
 
 @test isbits( @NT( ::Int64, ::Float64)) == true
 
@@ -42,21 +41,6 @@ nt = @NT( a=1, b=2, c=3 )
 @test nt.b == 2
 @test nt.c == 3
 @test haskey( nt, :x ) == false
-x = setindex( nt, :x, 123 )
-@test x.x == 123
-@test x.a == 1
-@test x.b == 2
-@test x.c == 3
-@test nt[[:c,:b]] == @NT( c=3, b=2 )
-
-y = delete( x, :a)
-@test x != y
-@test haskey( nt, :a ) == true
-@test haskey( y, :a ) == false
-@test x.x == 123
-@test x.a == 1
-@test x.b == 2
-@test x.c == 3
 
 @test map(-, @NT(x=1, y=2)) == @NT(x=-1, y=-2)
 @test map(+, @NT(x=1, y=2), @NT(x=1, y=2)) == @NT(x=2, y=4)
