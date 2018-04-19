@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/JuliaData/NamedTuples.jl.svg?branch=master)](https://travis-ci.org/JuliaData/NamedTuples.jl)
+[![Build Status](https://ci.appveyor.com/api/projects/status/github/JuliaData/NamedTuples.jl?svg=true)](https://ci.appveyor.com/project/quinnj/namedtuples-jl)
 
 # NamedTuples
 
