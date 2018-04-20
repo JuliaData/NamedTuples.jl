@@ -1,5 +1,6 @@
 using NamedTuples
 using Base.Test
+using Nullables
 
 @test @NT( a = 1 ).a == 1
 @test @NT( a = 1 )[1] == 1
@@ -53,9 +54,12 @@ nt = @NT( a=1, b=2, c=3 )
 
 @test merge( nt, @NT( d = "hello", e = "world"))  == @NT( a=1,b=2,c=3,d="hello",e="world")
 
-@test get.(@NT( a = Nullable(3), b = Nullable("world") )) == @NT( a = 3, b = "world")
-@test_throws MethodError @NT( a = 3) .+ [4]
-@test_throws MethodError [4] .+ @NT( a = 3)
+if VERSION < v"0.7.0-DEV.2738"
+    # TODO: fix broadcast with 0.7
+    @test get.(@NT( a = Nullable(3), b = Nullable("world") )) == @NT( a = 3, b = "world")
+    @test_throws MethodError @NT( a = 3) .+ [4]
+    @test_throws MethodError [4] .+ @NT( a = 3)
+end
 
 # serialize and deserialize
 addprocs(1)
@@ -73,4 +77,8 @@ serialize(io, Union{})
 # allow custom types
 struct Empty end
 nt = @NT(a::Empty, b::Int)
-@test nt.parameters[1] == Empty
+if VERSION < v"0.7.0-DEV.2738"
+    @test nt.parameters[1] == Empty
+else
+    @test nt.parameters[2] == Tuple{Empty, Int}
+end

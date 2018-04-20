@@ -1,20 +1,13 @@
 __precompile__()
 module NamedTuples
 
-export @NT, NamedTuple
+export @NT
 
-abstract type NamedTuple{K, V<:Tuple} end
+if VERSION < v"0.7.0-DEV.2738"
+    export NamedTuple
+    abstract type NamedTuple{K, V<:Tuple} end
+end
 
-Base.keys( t::NamedTuple ) = fieldnames( t )
-Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in 1:nfields( t ) ]
-Base.haskey( t::NamedTuple, k ) = k in keys(t)
-Base.length( t::NamedTuple ) = nfields( t )
-# Iteration
-Base.start( t::NamedTuple ) = 1
-Base.done( t::NamedTuple, iter ) = iter > nfields( t )
-Base.next( t::NamedTuple, iter ) = ( getfield( t, iter ), iter + 1 )
-Base.endof( t::NamedTuple ) = length( t )
-Base.last( t::NamedTuple ) = t[end]
 function Base.show( io::IO, t::NamedTuple )
     print(io, "(")
     first = true
@@ -25,43 +18,63 @@ function Base.show( io::IO, t::NamedTuple )
     end
     print(io, ")")
 end
-# Make this indexable so that it works like a Tuple
-Base.getindex( t::NamedTuple, i::Int ) = getfield( t, i )
-# We also support indexing by symbol
-Base.getindex( t::NamedTuple, i::Symbol ) = getfield( t, i )
-# This is a linear lookup...
-Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
-# Deep compare
-import Base: ==
 
-@generated function ==( lhs::NamedTuple, rhs::NamedTuple)
-    if !isequal(fieldnames(lhs), fieldnames(rhs)) || lhs !== rhs
-        return false
-    end
-
-    q = quote end
-    
-    for i in 1:length( fieldnames(lhs) )
-        push!(q.args, :(lhs[$(i)] == rhs[$(i)] || return false))
-    end
-
-    return q 
+function NamedTuple{names}(args...) where {names}
+    NamedTuple{names}(args)
 end
 
-# Deep hash
-@generated function Base.hash(nt::NamedTuple, hs::UInt64)
-    q = quote 
-        h = 17
-    end
-
-    for i in 1:length(fieldnames(nt))
-        push!(q.args, :(h = h * 23 + hash(nt[$(i)], hs)))
-    end
-
-    return q
+function NamedTuple{names,T}(args...) where {names, T <: Tuple}
+    NamedTuple{names, T}(args)
 end
 
+if VERSION < v"0.7.0-DEV.2738"
+    Base.keys( t::NamedTuple ) = fieldnames( t )
+    Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in 1:nfields( t ) ]
+    Base.haskey( t::NamedTuple, k ) = k in keys(t)
+    Base.length( t::NamedTuple ) = nfields( t )
+    # Iteration
+    Base.start( t::NamedTuple ) = 1
+    Base.done( t::NamedTuple, iter ) = iter > nfields( t )
+    Base.next( t::NamedTuple, iter ) = ( getfield( t, iter ), iter + 1 )
+    Base.endof( t::NamedTuple ) = length( t )
+    Base.last( t::NamedTuple ) = t[end]
 
+    # Make this indexable so that it works like a Tuple
+    Base.getindex( t::NamedTuple, i::Int ) = getfield( t, i )
+    # We also support indexing by symbol
+    Base.getindex( t::NamedTuple, i::Symbol ) = getfield( t, i )
+    # This is a linear lookup...
+    Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
+    # Deep compare
+    import Base: ==
+
+    @generated function ==( lhs::NamedTuple, rhs::NamedTuple)
+        if !isequal(fieldnames(lhs), fieldnames(rhs)) || lhs !== rhs
+            return false
+        end
+
+        q = quote end
+
+        for i in 1:length( fieldnames(lhs) )
+            push!(q.args, :(lhs[$(i)] == rhs[$(i)] || return false))
+        end
+
+        return q
+    end
+
+    # Deep hash
+    @generated function Base.hash(nt::NamedTuple, hs::UInt64)
+        q = quote
+            h = 17
+        end
+
+        for i in 1:length(fieldnames(nt))
+            push!(q.args, :(h = h * 23 + hash(nt[$(i)], hs)))
+        end
+
+        return q
+    end
+end
 # Helper type, for transforming parse tree to NameTuple definition
 struct ParseNode{T} end
 
@@ -100,6 +113,10 @@ function trans( sym::Symbol )
     return (sym, nothing, nothing)
 end
 
+function trans( qt::QuoteNode )
+    return (qt.value, nothing)
+end
+
 function trans( ::Type{ParseNode{:quote}}, expr::Expr )
     return trans( expr.args[1] )
 end
@@ -113,44 +130,60 @@ function trans{T}( ::Type{ParseNode{T}}, expr::Expr)
     return (nothing, nothing, expr)
 end
 
-function gen_namedtuple_ctor_body(n::Int, args)
-    types = [ :(typeof($x)) for x in args ]
-    cnvt = [ :(convert(fieldtype(TT,$n),$(args[n]))) for n = 1:n ]
-    if n == 0
-        texpr = :T
-    else
-        texpr = :(NT{$(types...)})
-    end
-    if isless(Base.VERSION, v"0.6.0-")
-        tcond = :(NT === NT.name.primary)
-    else
-        tcond = :(isa(NT,UnionAll))
-    end
-    quote
-        if $tcond
-            TT = $texpr
+if VERSION < v"0.7.0-DEV.2738"
+    function gen_namedtuple_ctor_body(n::Int, args)
+        types = [ :(typeof($x)) for x in args ]
+        cnvt = [ :(convert(fieldtype(TT,$n),$(args[n]))) for n = 1:n ]
+        if n == 0
+            texpr = :T
         else
-            TT = NT
+            texpr = :(NT{$(types...)})
         end
-        if nfields(TT) !== $n
+        if isless(Base.VERSION, v"0.6.0-")
+            tcond = :(NT === NT.name.primary)
+        else
+            tcond = :(isa(NT,UnionAll))
+        end
+        quote
+            if $tcond
+                TT = $texpr
+            else
+                TT = NT
+            end
+            if nfields(TT) !== $n
+                throw(ArgumentError("wrong number of arguments to named tuple constructor"))
+            end
+            $(Expr(:new, :TT, cnvt...))
+        end
+    end
+
+    # constructor for all NamedTuples
+    @generated function (::Type{NT}){NT<:NamedTuple}(args...)
+        n = length(args)
+        aexprs = [ :(args[$i]) for i = 1:n ]
+        return gen_namedtuple_ctor_body(n, aexprs)
+    end
+
+
+    # specialized for certain argument counts
+    for n = 0:5
+        args = [ Symbol("x$n") for n = 1:n ]
+        @eval function (::Type{NT}){NT<:NamedTuple}($(args...))
+            $(gen_namedtuple_ctor_body(n, args))
+        end
+    end
+
+    function NamedTuple{names,T}(args::Tuple) where {names, T <: Tuple}
+        if length(names)==length(args)
+            ty=make_tuple([names...])
+            ty{T.parameters...}(args...)
+        else
             throw(ArgumentError("wrong number of arguments to named tuple constructor"))
         end
-        $(Expr(:new, :TT, cnvt...))
     end
-end
 
-# constructor for all NamedTuples
-@generated function (::Type{NT}){NT<:NamedTuple}(args...)
-    n = length(args)
-    aexprs = [ :(args[$i]) for i = 1:n ]
-    return gen_namedtuple_ctor_body(n, aexprs)
-end
-
-# specialized for certain argument counts
-for n = 0:5
-    args = [ Symbol("x$n") for n = 1:n ]
-    @eval function (::Type{NT}){NT<:NamedTuple}($(args...))
-        $(gen_namedtuple_ctor_body(n, args))
+    function NamedTuple{names}(args::Tuple) where {names}
+        NamedTuple{names, typeof(args)}(args)
     end
 end
 
@@ -182,19 +215,22 @@ function create_namedtuple_type(fields::Vector{Symbol}, mod::Module = NamedTuple
     return getfield(mod, name)
 end
 
-
 #
 # Given a symbol list create the NamedTuple
 #
-@doc doc"Given a symbol vector create the `NamedTuple`" ->
+"Given a symbol vector create the `NamedTuple`"
 function make_tuple( syms::Vector{Symbol} )
-    return create_namedtuple_type( syms )
+    if VERSION < v"0.7.0-DEV.2738"
+        return create_namedtuple_type( syms )
+    else
+        return Expr(:curly, :NamedTuple, tuple(syms...))
+    end
 end
 
 #
 # Given an expression vector create the NamedTuple
 #
-@doc doc"Given an expression vector create the `NamedTuple`" ->
+"Given an expression vector create the `NamedTuple`"
 function make_tuple( exprs::Vector)
     len    = length( exprs )
     fields = Array{Symbol}(len)
@@ -211,27 +247,31 @@ function make_tuple( exprs::Vector)
         if( construct == true && val == nothing || ( i > 1 && construct == false && val != nothing ))
             error( "Invalid tuple, all values must be specified during construction @ ($expr)")
         end
-        construct  = val != nothing
-        fields[i]  = sym != nothing?sym:Symbol( "_$(i)_")
-        typs[i] = typ
+        construct  = val !== nothing
+        fields[i]  = sym !== nothing ? sym : Symbol( "_$(i)_")
+        typs[i] = typ !== nothing ? typ : Any
         # On construction ensure that the types are consitent with the declared types, if applicable
-        values[i]  = ( typ != nothing && construct)? Expr( :call, :convert, typ, val ) : val
+        values[i]  = ( typ !== nothing && construct)? Expr( :call, :convert, typ, val ) : val
     end
 
-    ty = create_namedtuple_type( fields )
+    ty = make_tuple(fields)
 
     # Either call the constructor with the supplied values or return the type
     if( !construct )
         if len == 0
             return ty
         end
-        return Expr( :curly, ty, typs... )
+        if VERSION < v"0.7.0-DEV.2738"
+            return Expr( :curly, ty, typs... )
+        else
+           return Expr(:curly, ty, Expr(:curly, :Tuple, typs...))
+        end
     else
         return Expr( :call, ty, values ... )
     end
 end
 
-@doc doc"""
+"""
 Syntax
 
     @NT( a, b )                 -> Defines a tuple with a and b as members
@@ -258,7 +298,7 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
 
     Test.foo( 1 ) # Returns a NamedTuple of 5 elements
     Test.bar( @NT( a= 2, c="hello")) # Returns `hellohello`
-""" ->
+"""
 macro NT( expr... )
     return esc(make_tuple( collect( expr )))
 end
@@ -270,144 +310,145 @@ else
     getfieldname( t, i ) = fieldname( t, i )
 end
 
-@inline function Base.map(f, nt::NamedTuple, nts::NamedTuple...)
-    # this method makes sure we don't define a map(f) method
-    _map(f, nt, nts...)
-end
-
-@generated function _map(f, nts::NamedTuple...)
-    fields = fieldnames(nts[1])
-    for x in nts[2:end]
-        if !isequal(fieldnames(x), fields)
-            throw(ArgumentError("All NamedTuple inputs to map must have the same fields in the same order"))
-        end
+if VERSION < v"0.7.0-DEV.2738"
+    @inline function Base.map(f, nt::NamedTuple, nts::NamedTuple...)
+        # this method makes sure we don't define a map(f) method
+        _map(f, nt, nts...)
     end
-    N = nfields(nts[1])
-    M = length(nts)
 
-    # This type will already exist if this function may be called
-    NT = create_namedtuple_type(fields, moduleof(nts[1]))
-    args = Expr[:(f($(Expr[:(getfield(nts[$i], $j)) for i = 1:M]...))) for j = 1:N]
-    quote
-        $NT($(args...))
-    end
-end
-
-@generated function Base.isless(t1::NamedTuple, t2::NamedTuple)
-    if !isequal(fieldnames(t1), fieldnames(t2))
-        throw(ArgumentError("NamedTuple inputs to isless must have the same fields in the same order"))
-    end
-    quote
-        Base.@nexprs $(nfields(t1)) i -> begin
-            a_i = getfield(t1, i)
-            b_i = getfield(t2, i)
-            if !isequal(a_i, b_i)
-                return isless(a_i, b_i)
+    @generated function _map(f, nts::NamedTuple...)
+        fields = fieldnames(nts[1])
+        for x in nts[2:end]
+            if !isequal(fieldnames(x), fields)
+                throw(ArgumentError("All NamedTuple inputs to map must have the same fields in the same order"))
             end
         end
-        return false
+        N = nfields(nts[1])
+        M = length(nts)
+
+        # This type will already exist if this function may be called
+        NT = create_namedtuple_type(fields, moduleof(nts[1]))
+        args = Expr[:(f($(Expr[:(getfield(nts[$i], $j)) for i = 1:M]...))) for j = 1:N]
+        quote
+            $NT($(args...))
+        end
     end
-end
+
+    @generated function Base.isless(t1::NamedTuple, t2::NamedTuple)
+        if !isequal(fieldnames(t1), fieldnames(t2))
+            throw(ArgumentError("NamedTuple inputs to isless must have the same fields in the same order"))
+        end
+        quote
+            Base.@nexprs $(nfields(t1)) i -> begin
+                a_i = getfield(t1, i)
+                b_i = getfield(t2, i)
+                if !isequal(a_i, b_i)
+                    return isless(a_i, b_i)
+                end
+            end
+            return false
+        end
+    end
 
 
-@doc doc"""
-Merge two NamedTuples favoring the lhs
-Order is preserved lhs names come first.
-This copies the underlying data.
-""" ->
-function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
-    nms = unique( vcat( fieldnames( lhs ), fieldnames( rhs )) )
-    ty = create_namedtuple_type( nms )
-    # FIXME should handle the type only case
-    vals = [ haskey( lhs, nm ) ? lhs[nm] : rhs[nm] for nm in nms ]
-    ty(vals...)
-end
+    """
+    Merge two NamedTuples favoring the lhs
+    Order is preserved lhs names come first.
+    This copies the underlying data.
+    """
+    function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
+        nms = unique( vcat( fieldnames( lhs ), fieldnames( rhs )) )
+        ty = create_namedtuple_type( nms )
+        # FIXME should handle the type only case
+        vals = [ haskey( lhs, nm ) ? lhs[nm] : rhs[nm] for nm in nms ]
+        ty(vals...)
+    end
 
-Base.Broadcast._containertype(::Type{<:NamedTuple}) = NamedTuple
-Base.Broadcast.promote_containertype(::Type{NamedTuple}, ::Type{NamedTuple}) = NamedTuple
-Base.Broadcast.promote_containertype(::Type{NamedTuple}, _) = error()
-Base.Broadcast.promote_containertype(_, ::Type{NamedTuple}) = error()
+    Base.Broadcast._containertype(::Type{<:NamedTuple}) = NamedTuple
+    Base.Broadcast.promote_containertype(::Type{NamedTuple}, ::Type{NamedTuple}) = NamedTuple
+    Base.Broadcast.promote_containertype(::Type{NamedTuple}, _) = error()
+    Base.Broadcast.promote_containertype(_, ::Type{NamedTuple}) = error()
 
-@inline function Base.Broadcast.broadcast_c(f, ::Type{NamedTuple}, nts...)
-    _map(f, nts...)
-end
+    @inline function Base.Broadcast.broadcast_c(f, ::Type{NamedTuple}, nts...)
+        _map(f, nts...)
+    end
 
-moduleof(t::DataType) = t.name.module
+    moduleof(t::DataType) = t.name.module
 
-if VERSION < v"0.6.0-dev"
-    uniontypes(u) = u.types
-else
-    const uniontypes = Base.uniontypes
-    moduleof(t::UnionAll) = moduleof(Base.unwrap_unionall(t))
-end
-
-struct NTType end
-struct NTVal end
-
-function Base.serialize{NT<:NamedTuple}(io::AbstractSerializer, ::Type{NT})
-    if NT === Union{}
-        Base.Serializer.write_as_tag(io, Base.Serializer.BOTTOM_TAG)
-    elseif isa(NT, Union)
-        Base.serialize_type(io, NTType)
-        serialize(io, Union)
-        serialize(io, [uniontypes(NT)...])
-    elseif isleaftype(NT)
-        Base.serialize_type(io, NTType)
-        serialize(io, fieldnames(NT))
-        serialize(io, moduleof(NT))
-        write(io.io, UInt8(0))
-        serialize(io, NT.parameters)
+    if VERSION < v"0.6.0-dev"
+        uniontypes(u) = u.types
     else
-        u = Base.unwrap_unionall(NT)
-        if isa(u, DataType) && NT === u.name.wrapper
+        const uniontypes = Base.uniontypes
+        moduleof(t::UnionAll) = moduleof(Base.unwrap_unionall(t))
+    end
+
+    struct NTType end
+    struct NTVal end
+    function Base.serialize{NT<:NamedTuple}(io::AbstractSerializer, ::Type{NT})
+        if NT === Union{}
+            Base.Serializer.write_as_tag(io, Base.Serializer.BOTTOM_TAG)
+        elseif isa(NT, Union)
+            Base.serialize_type(io, NTType)
+            serialize(io, Union)
+            serialize(io, [uniontypes(NT)...])
+        elseif isleaftype(NT)
             Base.serialize_type(io, NTType)
             serialize(io, fieldnames(NT))
             serialize(io, moduleof(NT))
-            write(io.io, UInt8(1))
+            write(io.io, UInt8(0))
+            serialize(io, NT.parameters)
         else
-            error("cannot serialize type $NT")
+            u = Base.unwrap_unionall(NT)
+            if isa(u, DataType) && NT === u.name.wrapper
+                Base.serialize_type(io, NTType)
+                serialize(io, fieldnames(NT))
+                serialize(io, moduleof(NT))
+                write(io.io, UInt8(1))
+            else
+                error("cannot serialize type $NT")
+            end
         end
     end
-end
 
-function Base.deserialize(io::AbstractSerializer, ::Type{NTType})
-    fnames = deserialize(io)
-    if fnames == Union
-        types = deserialize(io)
-        return Union{types...}
-    else
-        mod = deserialize(io)
-        NT = create_namedtuple_type(fnames, mod)
-        if read(io.io, UInt8) == 0
-            params = deserialize(io)
-            return NT{params...}
+    function Base.deserialize(io::AbstractSerializer, ::Type{NTType})
+        fnames = deserialize(io)
+        if fnames == Union
+            types = deserialize(io)
+            return Union{types...}
         else
-            return NT
+            mod = deserialize(io)
+            NT = create_namedtuple_type(fnames, mod)
+            if read(io.io, UInt8) == 0
+                params = deserialize(io)
+                return NT{params...}
+            else
+                return NT
+            end
         end
     end
-end
 
-function Base.serialize(io::AbstractSerializer, x::NamedTuple)
-    Base.serialize_type(io, NTVal)
-    serialize(io, typeof(x))
-    for i in 1:nfields(x)
-        serialize(io, getfield(x, i))
+    function Base.serialize(io::AbstractSerializer, x::NamedTuple)
+        Base.serialize_type(io, NTVal)
+        serialize(io, typeof(x))
+        for i in 1:nfields(x)
+            serialize(io, getfield(x, i))
+        end
     end
-end
 
-function Base.deserialize(io::AbstractSerializer, ::Type{NTVal})
-    NT = deserialize(io)
-    nf = nfields(NT)
-    if nf == 0
-        return NT()
-    elseif nf == 1
-        return NT(deserialize(io))
-    elseif nf == 2
-        return NT(deserialize(io), deserialize(io))
-    elseif nf == 3
-        return NT(deserialize(io), deserialize(io), deserialize(io))
-    else
-        return NT(Any[ deserialize(io) for i = 1:nf ]...)
+    function Base.deserialize(io::AbstractSerializer, ::Type{NTVal})
+        NT = deserialize(io)
+        nf = nfields(NT)
+        if nf == 0
+            return NT()
+        elseif nf == 1
+            return NT(deserialize(io))
+        elseif nf == 2
+            return NT(deserialize(io), deserialize(io))
+        elseif nf == 3
+            return NT(deserialize(io), deserialize(io), deserialize(io))
+        else
+            return NT(Any[ deserialize(io) for i = 1:nf ]...)
+        end
     end
 end
 
