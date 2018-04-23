@@ -1,24 +1,14 @@
 __precompile__()
 module NamedTuples
+using Compat
 
-export @NT
+export @NT, NamedTuple, @nt
 
 if VERSION < v"0.7.0-DEV.2738"
-    export NamedTuple
     abstract type NamedTuple{K, V<:Tuple} end
 end
 
-function Base.show( io::IO, t::NamedTuple )
-    print(io, "(")
-    first = true
-    for (k,v) in zip(keys(t),values(t))
-        !first && print(io, ", ")
-        print(io, k, " = "); show(io, v)
-        first = false
-    end
-    print(io, ")")
-end
-
+# Helper functions to allow `NamedTuple(args)` instead of `NamedTuple((args))` 
 function NamedTuple{names}(args...) where {names}
     NamedTuple{names}(args)
 end
@@ -27,54 +17,6 @@ function NamedTuple{names,T}(args...) where {names, T <: Tuple}
     NamedTuple{names, T}(args)
 end
 
-if VERSION < v"0.7.0-DEV.2738"
-    Base.keys( t::NamedTuple ) = fieldnames( t )
-    Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in 1:nfields( t ) ]
-    Base.haskey( t::NamedTuple, k ) = k in keys(t)
-    Base.length( t::NamedTuple ) = nfields( t )
-    # Iteration
-    Base.start( t::NamedTuple ) = 1
-    Base.done( t::NamedTuple, iter ) = iter > nfields( t )
-    Base.next( t::NamedTuple, iter ) = ( getfield( t, iter ), iter + 1 )
-    Base.endof( t::NamedTuple ) = length( t )
-    Base.last( t::NamedTuple ) = t[end]
-
-    # Make this indexable so that it works like a Tuple
-    Base.getindex( t::NamedTuple, i::Int ) = getfield( t, i )
-    # We also support indexing by symbol
-    Base.getindex( t::NamedTuple, i::Symbol ) = getfield( t, i )
-    # This is a linear lookup...
-    Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
-    # Deep compare
-    import Base: ==
-
-    @generated function ==( lhs::NamedTuple, rhs::NamedTuple)
-        if !isequal(fieldnames(lhs), fieldnames(rhs)) || lhs !== rhs
-            return false
-        end
-
-        q = quote end
-
-        for i in 1:length( fieldnames(lhs) )
-            push!(q.args, :(lhs[$(i)] == rhs[$(i)] || return false))
-        end
-
-        return q
-    end
-
-    # Deep hash
-    @generated function Base.hash(nt::NamedTuple, hs::UInt64)
-        q = quote
-            h = 17
-        end
-
-        for i in 1:length(fieldnames(nt))
-            push!(q.args, :(h = h * 23 + hash(nt[$(i)], hs)))
-        end
-
-        return q
-    end
-end
 # Helper type, for transforming parse tree to NameTuple definition
 struct ParseNode{T} end
 
@@ -122,11 +64,11 @@ function trans( ::Type{ParseNode{:quote}}, expr::Expr )
 end
 
 # Literal nodes
-function trans{T}( lit::T )
+function trans( lit::T ) where T
     return (nothing, nothing, lit)
 end
 
-function trans{T}( ::Type{ParseNode{T}}, expr::Expr)
+function trans( ::Type{ParseNode{T}}, expr::Expr) where T
     return (nothing, nothing, expr)
 end
 
@@ -158,12 +100,11 @@ if VERSION < v"0.7.0-DEV.2738"
     end
 
     # constructor for all NamedTuples
-    @generated function (::Type{NT}){NT<:NamedTuple}(args...)
+    @generated function (::Type{NT})(args...) where NT<:NamedTuple
         n = length(args)
         aexprs = [ :(args[$i]) for i = 1:n ]
         return gen_namedtuple_ctor_body(n, aexprs)
     end
-
 
     # specialized for certain argument counts
     for n = 0:5
@@ -173,9 +114,28 @@ if VERSION < v"0.7.0-DEV.2738"
         end
     end
 
+    # Allows `NamedTuple{names, T<:Tuple}((args))` format in v0.6
+    """
+    Syntax
+
+        NamedTuple{( :a, :b )}                  -> Defines a tuple with a and b as members
+        NamedTuple{( :a, :b ), Tuple{Int64, Float64}} -> Defines a tuple with the specific arg types as members
+        NamedTuple{( :a, :b )}( 1, "hello")     -> Defines and constructs a tuple with the specifed members and values
+        NamedTuple{( :a ), Tuple{Int64}}( 2.0 ) -> Calls `convert( Int64, 2.0 )` on construction and sets `a`
+
+    NamedTuples may be used anywhere you would use a regular Tuple, this includes method definition and return values.
+
+        using NamedTuples
+
+        function bar( nt::NamedTuple{(:a, :c), Tuple{Int64, String}} )
+            return repeat( nt.c, nt.a )
+        end
+
+        bar( @NT( a= 2, c="hello")) # Returns `hellohello`
+    """
     function NamedTuple{names,T}(args::Tuple) where {names, T <: Tuple}
-        if length(names)==length(args)
-            ty=make_tuple([names...])
+        if length(names) == length(args) == length(T.parameters)
+            ty=create_namedtuple_type([names...])
             ty{T.parameters...}(args...)
         else
             throw(ArgumentError("wrong number of arguments to named tuple constructor"))
@@ -185,9 +145,14 @@ if VERSION < v"0.7.0-DEV.2738"
     function NamedTuple{names}(args::Tuple) where {names}
         NamedTuple{names, typeof(args)}(args)
     end
+
+    # Pretty print type information
+    function Base.show(io::IO, ::Type{<:NamedTuple{K, T}}) where {K, T<:Tuple}
+        print(io, "NamedTuple{$K, $T}")
+    end
 end
 
-function create_struct_expr(name::Symbol, fields::Vector{Symbol}, mod::Module = NamedTuples)
+function create_struct_expr(name::Symbol, fields::Vector{Symbol})
     len = length( fields )
     types = [Symbol("T$n") for n in 1:len]
     symbols = [QuoteNode(fields[n]) for n in 1:len]
@@ -202,29 +167,26 @@ function create_struct_expr(name::Symbol, fields::Vector{Symbol}, mod::Module = 
                     Expr(:tuple)))  # suppress default constructors
 end
 
-# Create a NameTuple type, if a type with these field names has not already
-# been constructed.
-# TODO: to make modules containing named tuples precompile-able, change `= NamedTuples` to `= current_module()`
-function create_namedtuple_type(fields::Vector{Symbol}, mod::Module = NamedTuples)
-    escaped_fieldnames = [replace(string(i), "_", "__") for i in fields]
-    name = Symbol( string( "_NT_", join( escaped_fieldnames, "_")) )
-    if !isdefined(mod, name)
-        def = create_struct_expr(name, fields, mod)
-        eval(mod, def)
-    end
-    return getfield(mod, name)
-end
-
 #
 # Given a symbol list create the NamedTuple
 #
-"Given a symbol vector create the `NamedTuple`"
-function make_tuple( syms::Vector{Symbol} )
-    if VERSION < v"0.7.0-DEV.2738"
-        return create_namedtuple_type( syms )
-    else
-        return Expr(:curly, :NamedTuple, tuple(syms...))
+if VERSION < v"0.7.0-DEV.2738"
+    "Given a symbol vector create the `NamedTuple`"
+    # Create a NamedTuple type, if a type with these field names has not already
+    # been constructed.
+    # TODO: to make modules containing named tuples precompile-able, change `= NamedTuples` to `= current_module()`
+    function create_namedtuple_type(fields::Vector{Symbol}, mod::Module = NamedTuples)
+        escaped_fieldnames = [replace(string(i), "_", "__") for i in fields]
+        name = Symbol( string( "_NT_", join( escaped_fieldnames, "_")) )
+        if !isdefined(mod, name)
+            def = create_struct_expr(name, fields)
+            eval(mod, def)
+        end
+        return getfield(mod, name)
     end
+else
+    "Given a symbol vector create the `NamedTuple`"
+    create_namedtuple_type(fields::Vector{Symbol}) = Expr(:curly, :NamedTuple, tuple(fields...))
 end
 
 #
@@ -233,9 +195,9 @@ end
 "Given an expression vector create the `NamedTuple`"
 function make_tuple( exprs::Vector)
     len    = length( exprs )
-    fields = Array{Symbol}(len)
-    values = Array{Any}(len)
-    typs   = Array{Any}(len)
+    fields = Array{Symbol}(undef, len)
+    values = Array{Any}(undef, len)
+    typs   = Array{Any}(undef, len)
 
     # Are we directly constructing the type, if so all values must be
     # supplied by the caller, we use this state to ensure this
@@ -251,18 +213,20 @@ function make_tuple( exprs::Vector)
         fields[i]  = sym !== nothing ? sym : Symbol( "_$(i)_")
         typs[i] = typ !== nothing ? typ : Any
         # On construction ensure that the types are consitent with the declared types, if applicable
-        values[i]  = ( typ !== nothing && construct)? Expr( :call, :convert, typ, val ) : val
+        values[i]  = ( typ !== nothing && construct) ? Expr( :call, :convert, typ, val ) : val
     end
 
-    ty = make_tuple(fields)
+    ty = create_namedtuple_type(fields)
 
     # Either call the constructor with the supplied values or return the type
     if( !construct )
         if len == 0
+            Base.depwarn("\"@NT( a, b )\" syntax for NamedTuple Type declaration is deprecated, use \"NamedTuple{(:a, :b)}\" instead.", Symbol("@NT"))
             return ty
         end
+        Base.depwarn("\"@NT( a::Int64, b::Float64 )\" syntax for NamedTuple Type declaration is deprecated, use \"NamedTuple{(:a, :b), Tuple{Int64, Float64}}\" instead.", Symbol("@NT"))
         if VERSION < v"0.7.0-DEV.2738"
-            return Expr( :curly, ty, typs... )
+           return Expr( :curly, ty, typs... )
         else
            return Expr(:curly, ty, Expr(:curly, :Tuple, typs...))
         end
@@ -274,15 +238,10 @@ end
 """
 Syntax
 
-    @NT( a, b )                 -> Defines a tuple with a and b as members
-    @NT( a::Int64, b::Float64 ) -> Defines a tuple with the specific arg types as members
     @NT( a = 1, b = "hello")  -> Defines and constructs a tuple with the specifed members and values
-    @NT( a, b )( 1, "hello")    -> Is equivalent to the above definition
-    @NT( a::Int64 )( 2.0 )      -> Calls `convert( Int64, 2.0 )` on construction and sets `a`
 
 NamedTuples may be used anywhere you would use a regular Tuple, this includes method definition and return values.
 
-    module Test
     using NamedTuples
 
     function foo( y )
@@ -290,17 +249,44 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
         x = 3
         return  @NT( a = 1, b = "world", c = "hello", d=a/x, y = a/y  )
     end
-    function bar( nt::@NT( a::Int64, c::ASCIIString ))
-        return repeat( nt.c, nt.a )
-    end
 
-    end
-
-    Test.foo( 1 ) # Returns a NamedTuple of 5 elements
-    Test.bar( @NT( a= 2, c="hello")) # Returns `hellohello`
+    foo( 1 ) # Returns a NamedTuple of 5 elements
 """
 macro NT( expr... )
-    return esc(make_tuple( collect( expr )))
+    args = collect( expr )
+    if isa(args, Vector{Symbol})
+        Base.depwarn("\"@NT( a, b )\" syntax for NamedTuple Type declaration is deprecated, use \"NamedTuple{(:a, :b)}\" instead.", Symbol("@NT"))
+        return esc(create_namedtuple_type(args))
+    else
+        return esc(make_tuple(args))
+    end
+end
+
+"""
+Syntax
+
+    @nt( ::Int64, ::Float64 ) -> Defines a named tuple type with automatic names
+"""
+macro nt(expr...)
+    args = collect( expr )
+    len = length(args)
+    typs = Array{Any}(undef, len)
+    fields = Array{Symbol}(undef, len)
+    for i in 1:len
+        ( sym, typ, val ) = trans( expr[i] )
+        if sym !== nothing || val !== nothing
+            throw(ArgumentError("Non-Type argument given to automatic NamedTuple declaration macro."))
+        else
+            typs[i] = typ
+            fields[i] = Symbol( "_$(i)_")
+        end
+    end
+    ty = create_namedtuple_type(fields)
+    if VERSION < v"0.7.0-DEV.2738"
+       return esc(Expr( :curly, ty, typs... ))
+    else
+       return esc(Expr(:curly, ty, Expr(:curly, :Tuple, typs...)))
+    end
 end
 
 # Helper function for 0.4 compat
@@ -311,6 +297,67 @@ else
 end
 
 if VERSION < v"0.7.0-DEV.2738"
+    function Base.show( io::IO, t::NamedTuple )
+        print(io, "(")
+        first = true
+        for (k,v) in zip(keys(t),values(t))
+            !first && print(io, ", ")
+            print(io, k, " = "); show(io, v)
+            first = false
+        end
+        print(io, ")")
+    end
+
+    function Base.isbits(::Type{NamedTuple{names, T}}) where {names, T<:Tuple}
+        isbits(T)
+    end
+    Base.keys( t::NamedTuple ) = fieldnames( t )
+    Base.values( t::NamedTuple ) = [ getfield( t, i ) for i in 1:nfields( t ) ]
+    Base.haskey( t::NamedTuple, k ) = k in keys(t)
+    Base.length( t::NamedTuple ) = nfields( t )
+    # Iteration
+    Base.start( t::NamedTuple ) = 1
+    Base.done( t::NamedTuple, iter ) = iter > nfields( t )
+    Base.next( t::NamedTuple, iter ) = ( getfield( t, iter ), iter + 1 )
+    Base.endof( t::NamedTuple ) = length( t )
+    Base.last( t::NamedTuple ) = t[end]
+
+    # Make this indexable so that it works like a Tuple
+    Base.getindex( t::NamedTuple, i::Int ) = getfield( t, i )
+    # We also support indexing by symbol
+    Base.getindex( t::NamedTuple, i::Symbol ) = getfield( t, i )
+    # This is a linear lookup...
+    Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
+    # Deep compare
+    import Base: ==
+
+    @generated function ==( lhs::NamedTuple, rhs::NamedTuple)
+        if !isequal(fieldnames(lhs), fieldnames(rhs)) || lhs !== rhs
+            return false
+        end
+
+        q = quote end
+
+        for i in 1:length( fieldnames(lhs) )
+            push!(q.args, :(lhs[$(i)] == rhs[$(i)] || return false))
+        end
+
+        return q
+    end
+
+    # Deep hash
+    @generated function Base.hash(nt::NamedTuple, hs::UInt)
+        q = quote
+            h = 17
+        end
+
+        for i in 1:length(fieldnames(nt))
+            push!(q.args, :(h = h * 23 + hash(nt[$(i)], hs)))
+        end
+
+        return q
+    end
+
     @inline function Base.map(f, nt::NamedTuple, nts::NamedTuple...)
         # this method makes sure we don't define a map(f) method
         _map(f, nt, nts...)
@@ -384,7 +431,7 @@ if VERSION < v"0.7.0-DEV.2738"
 
     struct NTType end
     struct NTVal end
-    function Base.serialize{NT<:NamedTuple}(io::AbstractSerializer, ::Type{NT})
+    function Base.serialize(io::AbstractSerializer, ::Type{NT}) where NT<:NamedTuple
         if NT === Union{}
             Base.Serializer.write_as_tag(io, Base.Serializer.BOTTOM_TAG)
         elseif isa(NT, Union)

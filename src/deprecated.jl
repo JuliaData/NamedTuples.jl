@@ -1,4 +1,4 @@
-using Base.depwarn
+using Base: depwarn
 import Base.getindex
 
 export setindex, delete
@@ -17,7 +17,7 @@ Create a new NamedTuple with the new value set on it, either overwriting
 the old value or appending a new value.
 This copies the underlying data.
 """
-function setindex{V}( t::NamedTuple, key::Symbol, val::V)
+function setindex( t::NamedTuple, key::Symbol, val::V) where V
     depwarn("`setindex(t::NamedTuple,  key::Symbol, val::V)` is deprecated", :setindex)
     nt = create_namedtuple_type( [key] )( val )
     return merge( t, nt )
