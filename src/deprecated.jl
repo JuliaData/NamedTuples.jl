@@ -33,3 +33,5 @@ function delete( t::NamedTuple, key::Symbol )
     vals = [ getindex( t, nm ) for nm in nms ]
     return ty(vals...)
 end
+
+@deprecate make_tuple(fields::Vector{Symbol}) create_namedtuple_type(fields) false
