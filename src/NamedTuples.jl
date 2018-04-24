@@ -41,17 +41,17 @@ import Base: ==
     end
 
     q = quote end
-    
+
     for i in 1:length( fieldnames(lhs) )
         push!(q.args, :(lhs[$(i)] == rhs[$(i)] || return false))
     end
 
-    return q 
+    return q
 end
 
 # Deep hash
 @generated function Base.hash(nt::NamedTuple, hs::UInt64)
-    q = quote 
+    q = quote
         h = 17
     end
 
@@ -254,7 +254,7 @@ macro NT( expr... )
 end
 
 # Helper function for 0.4 compat
-if VERSION < v"0.5.0" 
+if VERSION < v"0.5.0"
     getfieldname( t, i ) = fieldnames(t)[i]
 else
     getfieldname( t, i ) = fieldname( t, i )
