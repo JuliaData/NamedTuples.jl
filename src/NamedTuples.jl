@@ -221,10 +221,11 @@ function make_tuple( exprs::Vector)
     # Either call the constructor with the supplied values or return the type
     if( !construct )
         if len == 0
-            Base.depwarn("\"@NT( a, b )\" syntax for NamedTuple Type declaration is deprecated, use \"NamedTuple{(:a, :b)}\" instead.", Symbol("@NT"))
+            Base.depwarn("\"@NT()\" syntax for NamedTuple type declaration is deprecated, use \"NamedTuple{()}\" instead.", Symbol("@NT"))
             return ty
         end
-        Base.depwarn("\"@NT( a::Int64, b::Float64 )\" syntax for NamedTuple Type declaration is deprecated, use \"NamedTuple{(:a, :b), Tuple{Int64, Float64}}\" instead.", Symbol("@NT"))
+        syms = [repr(i) for i in fields]
+        Base.depwarn("\"@NT($(join(exprs, ", ")))\" syntax for NamedTuple type declaration is deprecated, use \"NamedTuple{($(join(syms, ", "))), Tuple{$(join(typs, ", "))}}\" instead.", Symbol("@NT"))
         if VERSION < v"0.7.0-DEV.2738"
            return Expr( :curly, ty, typs... )
         else
@@ -255,7 +256,7 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
 macro NT( expr... )
     args = collect( expr )
     if isa(args, Vector{Symbol})
-        Base.depwarn("\"@NT( a, b )\" syntax for NamedTuple Type declaration is deprecated, use \"NamedTuple{(:a, :b)}\" instead.", Symbol("@NT"))
+        Base.depwarn("\"@NT($(join(expr, ", ")))\" syntax for NamedTuple type declaration is deprecated, use \"NamedTuple{$(repr(expr))}\" instead.", Symbol("@NT"))
         return esc(create_namedtuple_type(args))
     else
         return esc(make_tuple(args))
@@ -305,7 +306,7 @@ if VERSION < v"0.7.0-DEV.2738"
             print(io, k, " = "); show(io, v)
             first = false
         end
-        print(io, ")")
+        print(io, length(t)==1 ? ",)" : ")")
     end
 
     function Base.isbits(::Type{NamedTuple{names, T}}) where {names, T<:Tuple}
