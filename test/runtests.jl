@@ -26,6 +26,8 @@ using Base.Test
 @test @NT( a ) ==  @NT( a )
 @test @NT( a ) !=  @NT( b )
 
+@test @NT(a::Int, b) == @NT(a::Int, b::Any)
+
 @test typeof( @NT( a::Int64, b::Float64 )(1, 3.0) ) == typeof( @NT( a = 1, b = 2.0 ))
 
 # Syntax tests, including anon named tuples
