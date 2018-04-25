@@ -50,7 +50,7 @@ import Base: ==
 end
 
 # Deep hash
-@generated function Base.hash(nt::NamedTuple, hs::UInt64)
+@generated function Base.hash(nt::NamedTuple, hs::UInt)
     q = quote
         h = 17
     end

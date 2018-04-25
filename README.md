@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/JuliaData/NamedTuples.jl.svg?branch=master)](https://travis-ci.org/JuliaData/NamedTuples.jl)
+[![Build Status](https://ci.appveyor.com/api/projects/status/github/JuliaData/NamedTuples.jl?svg=true)](https://ci.appveyor.com/project/quinnj/namedtuples-jl)
 
 # NamedTuples
 
@@ -41,7 +42,7 @@ Test.bar( @NT( a= 2, c="hello")) # Returns `hellohello`
 There is at most one instance of a NamedTuple type with a given set of Members and Types, hence
 
 ```julia
-typeof( @NT( a::Int64, b::Float64 )(1, 3.0) ) == typeof( @NT( a = 1, b = 2.0 ))
+typeof( @NT( a::Int, b::Float64 )(1, 3.0) ) == typeof( @NT( a = 1, b = 2.0 ))
 ```
 
 NamedTuple definitions are shared across all modules. The underlying immutable types are constructed at first use.
