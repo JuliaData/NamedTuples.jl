@@ -41,17 +41,17 @@ import Base: ==
     end
 
     q = quote end
-    
+
     for i in 1:length( fieldnames(lhs) )
         push!(q.args, :(lhs[$(i)] == rhs[$(i)] || return false))
     end
 
-    return q 
+    return q
 end
 
 # Deep hash
 @generated function Base.hash(nt::NamedTuple, hs::UInt64)
-    q = quote 
+    q = quote
         h = 17
     end
 
@@ -201,11 +201,11 @@ function make_tuple( exprs::Vector)
         if( construct == true && val == nothing || ( i > 1 && construct == false && val != nothing ))
             error( "Invalid tuple, all values must be specified during construction @ ($expr)")
         end
-        construct  = val != nothing
-        fields[i]  = sym != nothing?sym:Symbol( "_$(i)_")
-        typs[i] = typ
+        construct = val !== nothing
+        fields[i] = sym !== nothing ? sym : Symbol("_$(i)_")
+        typs[i] = typ !== nothing ? typ : Any
         # On construction ensure that the types are consitent with the declared types, if applicable
-        values[i]  = ( typ != nothing && construct)? Expr( :call, :convert, typ, val ) : val
+        values[i] = (typ !== nothing && construct) ? Expr( :call, :convert, typ, val ) : val
     end
 
     ty = create_namedtuple_type( fields )
@@ -254,7 +254,7 @@ macro NT( expr... )
 end
 
 # Helper function for 0.4 compat
-if VERSION < v"0.5.0" 
+if VERSION < v"0.5.0"
     getfieldname( t, i ) = fieldnames(t)[i]
 else
     getfieldname( t, i ) = fieldname( t, i )
