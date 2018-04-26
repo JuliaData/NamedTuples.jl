@@ -116,3 +116,7 @@ module B
 end
 
 @test A.NT === B.NT
+
+# Iterator constructor
+@test @NT(a::Int, b::Float64)(Any[1.0, 2]) === @NT(a=1, b=2.0)
+@test @NT(a, b)(Any[1.0, 2]) === @NT(a=1.0, b=2)

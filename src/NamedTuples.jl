@@ -157,6 +157,18 @@ end
 end
 
 if VERSION < v"0.7.0-DEV.2738"
+    function (::Type{NT})(itr) where {NT <: NamedTuple}
+        T = isa(NT, DataType) ? Tuple{NT.parameters...} : Tuple
+        NT(T(itr))
+    end
+else
+    # TODO: Will need to be wrapped in a VERSION check when
+    # https://github.com/JuliaLang/julia/pull/26914 is merged
+    NamedTuple{names, T}(itr) where {names, T <: Tuple} = NamedTuple{names, T}(T(itr))
+    NamedTuple{names}(itr) where {names} = NamedTuple{names}(Tuple(itr))
+end
+
+if VERSION < v"0.7.0-DEV.2738"
 
 # Create a NameTuple type, if a type with these field names has not already been
 # constructed.
