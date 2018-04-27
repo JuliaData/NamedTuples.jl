@@ -376,7 +376,7 @@ Base.Broadcast.promote_containertype(_, ::Type{NamedTuple}) = error()
     _map(f, nts...)
 end
 
-else
+elseif VERSION < v"0.7.0-DEV.4955"
 
 @inline function Base.Broadcast.broadcast(f, nt::NamedTuple)
     map(f, nt)

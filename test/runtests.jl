@@ -78,7 +78,10 @@ y = delete( x, :a)
 
 @test merge( nt, @NT( d = "hello", e = "world"))  == @NT( a=1,b=2,c=3,d="hello",e="world")
 
-@test get.(@NT( a = Nullable(3), b = Nullable("world") )) == @NT( a = 3, b = "world")
+# TODO: Support new broadcasting interface (https://github.com/JuliaLang/julia/pull/26891)
+if VERSION < v"0.7.0-DEV.4955"
+    @test get.(@NT( a = Nullable(3), b = Nullable("world") )) == @NT( a = 3, b = "world")
+end
 @test_throws MethodError @NT( a = 3) .+ [4]
 @test_throws MethodError [4] .+ @NT( a = 3)
 
