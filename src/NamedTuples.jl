@@ -3,6 +3,9 @@ module NamedTuples
 
 export @NT, NamedTuple, setindex, delete
 
+moduleof(t::DataType) = t.name.module
+moduleof(t::UnionAll) = moduleof(Base.unwrap_unionall(t))
+
 abstract type NamedTuple end
 
 Base.keys( t::NamedTuple ) = fieldnames( t )
@@ -347,15 +350,6 @@ Base.Broadcast.promote_containertype(_, ::Type{NamedTuple}) = error()
     _map(f, nts...)
 end
 
-moduleof(t::DataType) = t.name.module
-
-if VERSION < v"0.6.0-dev"
-    uniontypes(u) = u.types
-else
-    const uniontypes = Base.uniontypes
-    moduleof(t::UnionAll) = moduleof(Base.unwrap_unionall(t))
-end
-
 struct NTType end
 struct NTVal end
 
@@ -365,7 +359,7 @@ function Base.serialize{NT<:NamedTuple}(io::AbstractSerializer, ::Type{NT})
     elseif isa(NT, Union)
         Base.serialize_type(io, NTType)
         serialize(io, Union)
-        serialize(io, [uniontypes(NT)...])
+        serialize(io, [Base.uniontypes(NT)...])
     elseif isleaftype(NT)
         Base.serialize_type(io, NTType)
         serialize(io, fieldnames(NT))
