@@ -92,3 +92,16 @@ serialize(io, Union{})
 struct Empty end
 nt = @NT(a::Empty, b::Int)
 @test nt.parameters[1] == Empty
+
+# type reuse
+module A
+    using NamedTuples
+    const NT = @NT(x)
+end
+
+module B
+    using NamedTuples
+    const NT = @NT(x)
+end
+
+@test A.NT === B.NT
