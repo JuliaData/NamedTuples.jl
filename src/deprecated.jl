@@ -1,17 +1,17 @@
-# BEGIN NamedTuples 4.1.0 deprecations
+# BEGIN NamedTuples 5.0.0 deprecations
 
 if VERSION < v"0.7.0-DEV.2738"
-    # Deprecate `@NT( a::Int64, b::Float64 )( 1, 2.0 )` syntax. Note that we're avoiding
-    # creating these functions on Julia 0.7 as NamedTuples.jl previously did not work and
-    # doesn't require the deprecation.
+    # Create a nicer error message for the breaking change to the
+    # `@NT( a::Int64, b::Float64 )( 1, 2.0 )` syntax. Note that we will avoid creating
+    # this error on Julia 0.7 as NamedTuples.jl previously did not work and won't require
+    # the deprecation.
 
-    @generated function (::Type{NT})(args...) where {NT <: NamedTuple}
-        Base.depwarn("`$NT(args...)` is deprecated, use `$NT((args...,))` instead.",
-                     Symbol("NamedTuple(args...)"))
-        n = length(args)
-        aexprs = [ :(args[$i]) for i = 1:n ]
-        return gen_namedtuple_ctor_body(n, aexprs)
+    function (::Type{NT})(args...) where {NT <: NamedTuple}
+        error(string(
+            "`$NT(args...)` is no longer supported as it is ambiguous with the new " *
+            "`$NT((args...,))` constructor."
+        ))
     end
 end
 
-# END NamedTuples 4.1.0 deprecations
+# END NamedTuples 5.0.0 deprecations
