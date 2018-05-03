@@ -1,4 +1,5 @@
 using NamedTuples
+using Suppressor
 using Base.Test
 
 @test @NT( a = 1 ).a == 1
@@ -106,3 +107,10 @@ module B
 end
 
 @test A.NT === B.NT
+
+# Test incremental compilation
+push!(LOAD_PATH, @__DIR__)
+output = @capture_err begin
+    Base.compilecache("IncrementalCompilation")
+end
+@test output == ""  # Shows output better than using `isempty`
