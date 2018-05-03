@@ -210,7 +210,7 @@ function make_tuple( exprs::Vector)
         end
         construct = val !== nothing
         fields[i] = sym !== nothing ? sym : Symbol("_$(i)_")
-        typs[i] = typ !== nothing ? typ : Any
+        typs[i] = typ !== nothing ? typ : :Any
         # On construction ensure that the types are consitent with the declared types, if applicable
         values[i] = (typ !== nothing && construct) ? Expr( :call, :convert, typ, val ) : val
     end
