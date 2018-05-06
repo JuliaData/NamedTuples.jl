@@ -158,7 +158,12 @@ for n = 0:5
     end
 end
 
-# Create a NameTuple type, if a type with these field names has not already been
+function namedtuple_name(fields::Vector{Symbol})
+    escaped_fieldnames = [replace(string(i), "_", "__") for i in fields]
+    name = Symbol( string( "_NT_", join( escaped_fieldnames, "_")) )
+end
+
+# Create a NamedTuple type, if a type with these field names has not already been
 # constructed.
 # NOTE: Packages containing named tuples at the top-level will not be precompile-able if
 # `mod = NamedTuples`. To address this create top-level named tuple types in the package's
@@ -166,8 +171,10 @@ end
 # the package's module. However this will make a distinct named tuple type which may result
 # in runtime incompatibilities with other packages also using named tuples.
 function create_namedtuple_type(fields::Vector{Symbol}, mod::Module = NamedTuples)
-    escaped_fieldnames = [replace(string(i), "_", "__") for i in fields]
-    name = Symbol( string( "_NT_", join( escaped_fieldnames, "_")) )
+    create_namedtuple_type(namedtuple_name(fields), tuple(fields...), mod)
+end
+
+function create_namedtuple_type(name::Symbol, fields::Tuple{Vararg{Symbol}}, mod::Module = NamedTuples)
     if !isdefined(mod, name)
         len = length( fields )
         types = [Symbol("T$n") for n in 1:len]
@@ -258,7 +265,7 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
 """ ->
 macro NT(exprs...)
     len    = length( exprs )
-    fields = Array{QuoteNode}(len)
+    fields = Array{Symbol}(len)
     values = Array{Any}(len)
     typs   = Array{Any}(len)
 
@@ -273,37 +280,26 @@ macro NT(exprs...)
             error( "Invalid tuple, all values must be specified during construction @ ($expr)")
         end
         construct = val !== nothing
-        fields[i] = QuoteNode(sym !== nothing ? sym : Symbol("_$(i)_"))
+        fields[i] = sym !== nothing ? sym : Symbol("_$(i)_")
         typs[i] = typ !== nothing ? typ : :Any
         # On construction ensure that the types are consitent with the declared types, if applicable
         values[i] = (typ !== nothing && construct) ? Expr( :call, :convert, typ, val ) : val
     end
 
+    name_q = QuoteNode(namedtuple_name(fields))
+    fields_q = QuoteNode.(fields)
+    NT = :(NamedTuples.create_namedtuple_type($name_q, tuple($(fields_q...))))
+
     ex = if construct
-        :(NamedTuples.NT([$(fields...)], Any[$(values...)]))
+        :($NT($(values...)))
     elseif len > 0 && !isa(exprs, Tuple{Vararg{Symbol}})
-        :(NamedTuples.NT([$(fields...)], Type[$(typs...)]))
+        :($NT{$(typs...)})
     else
-        :(NamedTuples.NT([$(fields...)]))
+        :($NT)
     end
 
     return esc(ex)
 end
-
-function NT(names::AbstractVector{Symbol}, values::AbstractVector)
-    T = NT(names)
-    T(values...)
-end
-
-function NT(names::AbstractVector{Symbol}, types::AbstractVector{<:Type})
-    T = NT(names)
-    T{types...}
-end
-
-function NT(names::AbstractVector{Symbol})
-    create_namedtuple_type(names)
-end
-
 
 # Helper function for 0.4 compat
 if VERSION < v"0.5.0"
