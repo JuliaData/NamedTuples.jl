@@ -39,7 +39,7 @@ Base.get( t::NamedTuple, i::Symbol, default ) = i in keys(t) ? t[i] : default
 import Base: ==
 
 @generated function ==( lhs::NamedTuple, rhs::NamedTuple)
-    if !isequal(fieldnames(lhs), fieldnames(rhs)) || lhs !== rhs
+    if !isequal(fieldnames(lhs), fieldnames(rhs))
         return false
     end
 
