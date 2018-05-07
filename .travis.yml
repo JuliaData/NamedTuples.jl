@@ -14,3 +14,5 @@ matrix:
 #script:
 #  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
 #  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("NamedTuples"); Pkg.test("NamedTuples"; coverage=true)'
+after_success:
+  - julia -e 'cd(Pkg.dir("NamedTuples")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
