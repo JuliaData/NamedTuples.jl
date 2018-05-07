@@ -20,6 +20,7 @@ using Base.Test
 @test ( x = @NT( a::Int64, b::Float64 )( 1, 2.0 ) ; typeof(x.a) == Int64 && typeof(x.b) == Float64 )
 @test @NT( a = 1, b = "hello")  ==  @NT( a, b )( 1, "hello")
 @test @NT( a = 1) != @NT( b = 1 )
+@test @NT(a=1) == @NT(a=1.)
 
 @test hash( @NT( a = 1, b = "hello"))  ==  hash( @NT( a, b )( 1, "hello") )
 @test hash( @NT( a = 1, b = "hello")) != hash( @NT( a = 1, b = 2.0 ))
