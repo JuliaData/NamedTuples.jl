@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/JuliaData/NamedTuples.jl.svg?branch=master)](https://travis-ci.org/JuliaData/NamedTuples.jl)
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/JuliaData/NamedTuples.jl?svg=true)](https://ci.appveyor.com/project/quinnj/namedtuples-jl)
+[![codecov.io](http://codecov.io/github/JuliaData/NamedTuples.jl/coverage.svg?branch=master)](http://codecov.io/github/JuliaData/NamedTuples.jl?branch=master)
 
 # NamedTuples
 
