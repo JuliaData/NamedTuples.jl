@@ -256,54 +256,9 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
     Test.foo( 1 ) # Returns a NamedTuple of 5 elements
     Test.bar( @NT( a= 2, c="hello")) # Returns `hellohello`
 """ ->
-macro NT(exprs...)
-    len    = length( exprs )
-    fields = Array{QuoteNode}(len)
-    values = Array{Any}(len)
-    typs   = Array{Any}(len)
-
-    # Are we directly constructing the type, if so all values must be
-    # supplied by the caller, we use this state to ensure this
-    construct = false
-    # handle the case where this is defining a datatype
-    for i in 1:len
-        expr = exprs[i]
-        ( sym, typ, val ) = trans( expr )
-        if( construct == true && val == nothing || ( i > 1 && construct == false && val != nothing ))
-            error( "Invalid tuple, all values must be specified during construction @ ($expr)")
-        end
-        construct = val !== nothing
-        fields[i] = QuoteNode(sym !== nothing ? sym : Symbol("_$(i)_"))
-        typs[i] = typ !== nothing ? typ : :Any
-        # On construction ensure that the types are consitent with the declared types, if applicable
-        values[i] = (typ !== nothing && construct) ? Expr( :call, :convert, typ, val ) : val
-    end
-
-    ex = if construct
-        :(NamedTuples.NT([$(fields...)], Any[$(values...)]))
-    elseif len > 0 && !isa(exprs, Tuple{Vararg{Symbol}})
-        :(NamedTuples.NT([$(fields...)], Type[$(typs...)]))
-    else
-        :(NamedTuples.NT([$(fields...)]))
-    end
-
-    return esc(ex)
+macro NT( expr... )
+    return esc(make_tuple( collect( expr )))
 end
-
-function NT(names::AbstractVector{Symbol}, values::AbstractVector)
-    T = NT(names)
-    T(values...)
-end
-
-function NT(names::AbstractVector{Symbol}, types::AbstractVector{<:Type})
-    T = NT(names)
-    T{types...}
-end
-
-function NT(names::AbstractVector{Symbol})
-    create_namedtuple_type(names)
-end
-
 
 # Helper function for 0.4 compat
 if VERSION < v"0.5.0"
