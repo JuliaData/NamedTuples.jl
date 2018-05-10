@@ -125,13 +125,8 @@ function gen_namedtuple_ctor_body(n::Int, args)
     else
         texpr = :(NT{$(types...)})
     end
-    if isless(Base.VERSION, v"0.6.0-")
-        tcond = :(NT === NT.name.primary)
-    else
-        tcond = :(isa(NT,UnionAll))
-    end
     quote
-        if $tcond
+        if isa(NT,UnionAll)
             TT = $texpr
         else
             TT = NT
@@ -260,13 +255,6 @@ macro NT( expr... )
     return esc(make_tuple( collect( expr )))
 end
 
-# Helper function for 0.4 compat
-if VERSION < v"0.5.0"
-    getfieldname( t, i ) = fieldnames(t)[i]
-else
-    getfieldname( t, i ) = fieldname( t, i )
-end
-
 @inline function Base.map(f, nt::NamedTuple, nts::NamedTuple...)
     # this method makes sure we don't define a map(f) method
     _map(f, nt, nts...)
@@ -307,7 +295,7 @@ end
 end
 
 function Base.getindex( t::NamedTuple, rng::AbstractVector )
-    names = unique( Symbol[ isa(i,Symbol) ? i : getfieldname(typeof(t),i) for i in rng ] )
+    names = unique( Symbol[ isa(i,Symbol) ? i : fieldname(typeof(t),i) for i in rng ] )
     ty = create_namedtuple_type( names )
     ty([ getfield( t, i ) for i in names ]...)
 end
