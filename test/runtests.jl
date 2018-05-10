@@ -4,6 +4,7 @@ using Base.Test
 @test @NT( a = 1 ).a == 1
 @test @NT( a = 1 )[1] == 1
 @test @NT( a = 1 )[:a] == 1
+@test @NT( a = 12)[:b,2] == 2
 
 @test @NT( :a = 1 ).a == 1
 @test @NT( :a = 1 )[1] == 1
@@ -11,6 +12,10 @@ using Base.Test
 
 @test length( @NT( a = 1)) == 1
 @test length( @NT( a = 1, b = 2.0)) == 2
+
+@test values(@NT(a=1,b=2)) == [1,2]
+@test get(@NT(a=1,b=2),:a,3) == 1
+@test get(@NT(a=1,b=2),:c,3) == 3
 
 @test first( @NT( a = 1, b = 2.0 )) == 1
 @test last( @NT( a = 1, b = "hello", c = 2.0 )) == 2.0
