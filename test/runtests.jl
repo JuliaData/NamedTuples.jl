@@ -57,6 +57,11 @@ x = setindex( nt, :x, 123 )
 @test x.c == 3
 @test nt[[:c,:b]] == @NT( c=3, b=2 )
 
+
+# Test "in-place" updating of elements
+ntupdate = setindex(nt, :a, 2)
+@test ntupdate.a == 2
+
 y = delete( x, :a)
 @test x != y
 @test haskey( nt, :a ) == true

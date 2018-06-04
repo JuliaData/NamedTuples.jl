@@ -320,7 +320,7 @@ This copies the underlying data.
 """ ->
 function setindex{V}( t::NamedTuple, key::Symbol, val::V)
     nt = create_namedtuple_type( [key] )( val )
-    return merge( t, nt )
+    return merge( nt, t )
 end
 
 @doc doc"""
