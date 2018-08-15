@@ -271,7 +271,7 @@ end
     M = length(nts)
 
     # This type will already exist if this function may be called
-    NT = create_namedtuple_type(fields, moduleof(nts[1]))
+    NT = create_namedtuple_type(collect(fields), moduleof(nts[1]))
     args = Expr[:(f($(Expr[:(getfield(nts[$i], $j)) for i = 1:M]...))) for j = 1:N]
     quote
         $NT($(args...))
