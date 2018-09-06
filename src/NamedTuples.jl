@@ -1,6 +1,15 @@
 __precompile__()
 module NamedTuples
 
+@static if VERSION >= v"0.7"
+export @NT
+macro NT( expr... )
+    return :(error("The NamedTuples package has been discontinued starting from Julia 0.7. Use the named tuples included in base Julia instead."))
+end
+gen_namedtuple_ctor_body(n, args) = :nothing
+
+else # VERSION
+
 export @NT, NamedTuple, setindex, delete
 
 moduleof(t::DataType) = t.name.module
@@ -143,14 +152,6 @@ end
     n = length(args)
     aexprs = [ :(args[$i]) for i = 1:n ]
     return gen_namedtuple_ctor_body(n, aexprs)
-end
-
-# specialized for certain argument counts
-for n = 0:5
-    args = [ Symbol("x$n") for n = 1:n ]
-    @eval function (::Type{NT}){NT<:NamedTuple}($(args...))
-        $(gen_namedtuple_ctor_body(n, args))
-    end
 end
 
 # Create a NameTuple type, if a type with these field names has not already been
@@ -409,6 +410,16 @@ function Base.deserialize(io::AbstractSerializer, ::Type{NTVal})
         return NT(deserialize(io), deserialize(io), deserialize(io))
     else
         return NT(Any[ deserialize(io) for i = 1:nf ]...)
+    end
+end
+
+end # VERSION
+
+# specialized for certain argument counts
+for n = 0:5
+    args = [ Symbol("x$n") for n = 1:n ]
+    @eval function (::Type{NT})($(args...)) where {NT<:NamedTuple}
+        $(gen_namedtuple_ctor_body(n, args))
     end
 end
 

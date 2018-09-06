@@ -2,6 +2,15 @@
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/JuliaData/NamedTuples.jl?svg=true)](https://ci.appveyor.com/project/quinnj/namedtuples-jl)
 [![codecov.io](http://codecov.io/github/JuliaData/NamedTuples.jl/coverage.svg?branch=master)](http://codecov.io/github/JuliaData/NamedTuples.jl?branch=master)
 
+# Important Notice
+
+This package is discontinued starting from Julia 0.7, since named
+tuples are now part of base Julia. Any use of the `@NT` macro will result
+in an error.
+
+The package can still be used on Julia 0.6 but will not be developed
+further.
+
 # NamedTuples
 
 NamedTuples.jl provides a high performance implementation of named tuples for Julia (cf named tuples in python). Julia tuples are restricted to supporting index based access. This new implementation allows both index and property based access. NamedTuples may be used anywhere that a tuple is currently being used, for example in the definition of a method or as the return value of a method. NamedTuples are implemented using Julia’s macro system, ensuring that the run time cost is equivalent to constructing a regular immutable type.
