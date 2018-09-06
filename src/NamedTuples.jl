@@ -6,6 +6,8 @@ export @NT, NamedTuple, setindex, delete
 moduleof(t::DataType) = t.name.module
 moduleof(t::UnionAll) = moduleof(Base.unwrap_unionall(t))
 
+if VERSION < v"0.7.0-DEV.2738"
+
 abstract type NamedTuple end
 
 Base.keys( t::NamedTuple ) = fieldnames( t )
@@ -65,6 +67,7 @@ end
     return q
 end
 
+end
 
 # Helper type, for transforming parse tree to NameTuple definition
 struct ParseNode{T} end
@@ -104,6 +107,10 @@ function trans( sym::Symbol )
     return (sym, nothing, nothing)
 end
 
+function trans( qt::QuoteNode )
+    return (qt.value, nothing)
+end
+
 function trans( ::Type{ParseNode{:quote}}, expr::Expr )
     return trans( expr.args[1] )
 end
@@ -116,6 +123,8 @@ end
 function trans{T}( ::Type{ParseNode{T}}, expr::Expr)
     return (nothing, nothing, expr)
 end
+
+if VERSION < v"0.7.0-DEV.2738"
 
 function gen_namedtuple_ctor_body(n::Int, args)
     types = [ :(typeof($x)) for x in args ]
@@ -139,19 +148,27 @@ function gen_namedtuple_ctor_body(n::Int, args)
 end
 
 # constructor for all NamedTuples
-@generated function (::Type{NT}){NT<:NamedTuple}(args...)
-    n = length(args)
+@generated function (::Type{NT})(args::Tuple) where {NT <: NamedTuple}
+    n = length(args.parameters)
     aexprs = [ :(args[$i]) for i = 1:n ]
-    return gen_namedtuple_ctor_body(n, aexprs)
+    gen_namedtuple_ctor_body(n, aexprs)
 end
 
-# specialized for certain argument counts
-for n = 0:5
-    args = [ Symbol("x$n") for n = 1:n ]
-    @eval function (::Type{NT}){NT<:NamedTuple}($(args...))
-        $(gen_namedtuple_ctor_body(n, args))
-    end
 end
+
+if VERSION < v"0.7.0-DEV.2738"
+    function (::Type{NT})(itr) where {NT <: NamedTuple}
+        T = isa(NT, DataType) ? Tuple{NT.parameters...} : Tuple
+        NT(T(itr))
+    end
+else
+    # TODO: Will need to be wrapped in a VERSION check when
+    # https://github.com/JuliaLang/julia/pull/26914 is merged
+    NamedTuple{names, T}(itr) where {names, T <: Tuple} = NamedTuple{names, T}(T(itr))
+    NamedTuple{names}(itr) where {names} = NamedTuple{names}(Tuple(itr))
+end
+
+if VERSION < v"0.7.0-DEV.2738"
 
 # Create a NameTuple type, if a type with these field names has not already been
 # constructed.
@@ -173,6 +190,12 @@ function create_namedtuple_type(fields::Vector{Symbol}, mod::Module = NamedTuple
         eval(mod, def)
     end
     return getfield(mod, name)
+end
+
+else
+
+create_namedtuple_type(fields::Vector{Symbol}) = NamedTuple{tuple(fields...)}
+
 end
 
 #
@@ -217,9 +240,13 @@ function make_tuple( exprs::Vector)
         if len == 0
             return ty
         end
-        return Expr( :curly, ty, typs... )
+        if VERSION < v"0.7.0-DEV.2738"
+            return Expr(:curly, ty, typs...)
+        else
+            return Expr(:curly, ty, Expr(:curly, :Tuple, typs...))
+        end
     else
-        return Expr( :call, ty, values ... )
+        return Expr( :call, ty, Expr(:tuple, values...) )
     end
 end
 
@@ -255,6 +282,9 @@ macro NT( expr... )
     return esc(make_tuple( collect( expr )))
 end
 
+
+if VERSION < v"0.7.0-DEV.2738"
+
 @inline function Base.map(f, nt::NamedTuple, nts::NamedTuple...)
     # this method makes sure we don't define a map(f) method
     _map(f, nt, nts...)
@@ -274,7 +304,7 @@ end
     NT = create_namedtuple_type(fields, moduleof(nts[1]))
     args = Expr[:(f($(Expr[:(getfield(nts[$i], $j)) for i = 1:M]...))) for j = 1:N]
     quote
-        $NT($(args...))
+        $NT(($(args...),))
     end
 end
 
@@ -294,12 +324,6 @@ end
     end
 end
 
-function Base.getindex( t::NamedTuple, rng::AbstractVector )
-    names = unique( Symbol[ isa(i,Symbol) ? i : fieldname(typeof(t),i) for i in rng ] )
-    ty = create_namedtuple_type( names )
-    ty([ getfield( t, i ) for i in names ]...)
-end
-
 @doc doc"""
 Merge two NamedTuples favoring the lhs
 Order is preserved lhs names come first.
@@ -309,8 +333,16 @@ function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
     nms = unique( vcat( fieldnames( lhs ), fieldnames( rhs )) )
     ty = create_namedtuple_type( nms )
     # FIXME should handle the type only case
-    vals = [ haskey( lhs, nm ) ? lhs[nm] : rhs[nm] for nm in nms ]
-    ty(vals...)
+    vals = tuple([ haskey( lhs, nm ) ? lhs[nm] : rhs[nm] for nm in nms ]...)
+    ty(vals)
+end
+
+end
+
+function Base.getindex( t::NamedTuple, rng::AbstractVector )
+    names = unique( Symbol[ isa(i,Symbol) ? i : fieldname(typeof(t),i) for i in rng ] )
+    ty = create_namedtuple_type( names )
+    ty(tuple([getfield(t, i) for i in names]...))
 end
 
 @doc doc"""
@@ -319,7 +351,7 @@ the old value or appending a new value.
 This copies the underlying data.
 """ ->
 function setindex{V}( t::NamedTuple, key::Symbol, val::V)
-    nt = create_namedtuple_type( [key] )( val )
+    nt = create_namedtuple_type( [key] )( (val,) )
     return merge( t, nt )
 end
 
@@ -327,11 +359,13 @@ end
 Create a new NamedTuple with the specified element removed.
 """ ->
 function delete( t::NamedTuple, key::Symbol )
-    nms = filter( x->x!=key, fieldnames( t ) )
+    nms = filter(x -> x != key, collect(fieldnames(t)))
     ty = create_namedtuple_type( nms )
-    vals = [ getindex( t, nm ) for nm in nms ]
-    return ty(vals...)
+    vals = tuple([getindex(t, nm) for nm in nms]...)
+    return ty(vals)
 end
+
+if VERSION < v"0.7.0-DEV.2738"
 
 Base.Broadcast._containertype(::Type{<:NamedTuple}) = NamedTuple
 Base.Broadcast.promote_containertype(::Type{NamedTuple}, ::Type{NamedTuple}) = NamedTuple
@@ -341,6 +375,16 @@ Base.Broadcast.promote_containertype(_, ::Type{NamedTuple}) = error()
 @inline function Base.Broadcast.broadcast_c(f, ::Type{NamedTuple}, nts...)
     _map(f, nts...)
 end
+
+elseif VERSION < v"0.7.0-DEV.4955"
+
+@inline function Base.Broadcast.broadcast(f, nt::NamedTuple)
+    map(f, nt)
+end
+
+end
+
+if VERSION < v"0.7.0-DEV.2738"
 
 struct NTType end
 struct NTVal end
@@ -400,16 +444,20 @@ function Base.deserialize(io::AbstractSerializer, ::Type{NTVal})
     NT = deserialize(io)
     nf = nfields(NT)
     if nf == 0
-        return NT()
+        return NT(())
     elseif nf == 1
-        return NT(deserialize(io))
+        return NT(tuple(deserialize(io)))
     elseif nf == 2
-        return NT(deserialize(io), deserialize(io))
+        return NT(tuple(deserialize(io), deserialize(io)))
     elseif nf == 3
-        return NT(deserialize(io), deserialize(io), deserialize(io))
+        return NT(tuple(deserialize(io), deserialize(io), deserialize(io)))
     else
-        return NT(Any[ deserialize(io) for i = 1:nf ]...)
+        return NT(tuple(Any[ deserialize(io) for i = 1:nf ]...))
     end
 end
+
+end
+
+include("deprecated.jl")
 
 end # module

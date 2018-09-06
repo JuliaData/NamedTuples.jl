@@ -1,4 +1,5 @@
 using NamedTuples
+using Nullables
 using Base.Test
 
 @test @NT( a = 1 ).a == 1
@@ -21,12 +22,12 @@ using Base.Test
 @test last( @NT( a = 1, b = "hello", c = 2.0 )) == 2.0
 @test [ v for v in @NT( a = 1.0, b = 2.0 ) ] == [ 1.0, 2.0 ]
 
-@test ( x = @NT( a::Int64, b::Float64 )( 1, 2.0 ) ; typeof(x.a) == Int64 && typeof(x.b) == Float64 )
-@test @NT( a = 1, b = "hello")  ==  @NT( a, b )( 1, "hello")
+@test ( x = @NT( a::Int64, b::Float64 )( (1, 2.0) ) ; typeof(x.a) == Int64 && typeof(x.b) == Float64 )
+@test @NT( a = 1, b = "hello")  ==  @NT( a, b )((1, "hello"))
 @test @NT( a = 1) != @NT( b = 1 )
 @test @NT(a=1) == @NT(a=1.)
 
-@test hash( @NT( a = 1, b = "hello"))  ==  hash( @NT( a, b )( 1, "hello") )
+@test hash( @NT( a = 1, b = "hello"))  ==  hash( @NT( a, b )((1, "hello")) )
 @test hash( @NT( a = 1, b = "hello")) != hash( @NT( a = 1, b = 2.0 ))
 
 @test @NT( a ) ==  @NT( a )
@@ -34,7 +35,7 @@ using Base.Test
 
 @test @NT(a::Int, b) == @NT(a::Int, b::Any)
 
-@test typeof( @NT( a::Int, b::Float64 )(1, 3.0) ) == typeof( @NT( a = 1, b = 2.0 ))
+@test typeof( @NT( a::Int, b::Float64 )((1, 3.0)) ) == typeof( @NT( a = 1, b = 2.0 ))
 
 # Syntax tests, including anon named tuples
 @test @NT( a, b ) <: NamedTuple
@@ -77,7 +78,10 @@ y = delete( x, :a)
 
 @test merge( nt, @NT( d = "hello", e = "world"))  == @NT( a=1,b=2,c=3,d="hello",e="world")
 
-@test get.(@NT( a = Nullable(3), b = Nullable("world") )) == @NT( a = 3, b = "world")
+# TODO: Support new broadcasting interface (https://github.com/JuliaLang/julia/pull/26891)
+if VERSION < v"0.7.0-DEV.4955"
+    @test get.(@NT( a = Nullable(3), b = Nullable("world") )) == @NT( a = 3, b = "world")
+end
 @test_throws MethodError @NT( a = 3) .+ [4]
 @test_throws MethodError [4] .+ @NT( a = 3)
 
@@ -97,7 +101,11 @@ serialize(io, Union{})
 # allow custom types
 struct Empty end
 nt = @NT(a::Empty, b::Int)
-@test nt.parameters[1] == Empty
+if VERSION < v"0.7.0-DEV.2738"
+    @test nt.parameters[1] == Empty
+else
+    @test nt.parameters[2] == Tuple{Empty, Int}
+end
 
 # type reuse
 module A
@@ -111,3 +119,7 @@ module B
 end
 
 @test A.NT === B.NT
+
+# Iterator constructor
+@test @NT(a::Int, b::Float64)(Any[1.0, 2]) === @NT(a=1, b=2.0)
+@test @NT(a, b)(Any[1.0, 2]) === @NT(a=1.0, b=2)
