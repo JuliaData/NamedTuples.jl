@@ -4,6 +4,8 @@
 
 # NamedTuples
 
+## Note: the [Named Tuple type](https://docs.julialang.org/en/v1/manual/types/#Named-Tuple-Types-1) functionality has been integrated into Julia Base as of Julia 0.7. Prefer using the Base implementation of NamedTuples when writing code for Julia 0.7 or higher.
+
 NamedTuples.jl provides a high performance implementation of named tuples for Julia (cf named tuples in python). Julia tuples are restricted to supporting index based access. This new implementation allows both index and property based access. NamedTuples may be used anywhere that a tuple is currently being used, for example in the definition of a method or as the return value of a method. NamedTuples are implemented using Julia’s macro system, ensuring that the run time cost is equivalent to constructing a regular immutable type.
 
 NamedTuples may also be used in cases where a small typed immutable dictionary is desired.
