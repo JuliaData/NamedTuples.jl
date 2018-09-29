@@ -198,18 +198,16 @@ create_namedtuple_type(fields::Vector{Symbol}) = NamedTuple{tuple(fields...)}
 
 end
 
-#
-# Given a symbol list create the NamedTuple
-#
-@doc doc"Given a symbol vector create the `NamedTuple`" ->
+"""
+Given a symbol vector create the `NamedTuple`
+"""
 function make_tuple( syms::Vector{Symbol} )
     return create_namedtuple_type( syms )
 end
 
-#
-# Given an expression vector create the NamedTuple
-#
-@doc doc"Given an expression vector create the `NamedTuple`" ->
+"""
+Given an expression vector create the `NamedTuple`
+"""
 function make_tuple( exprs::Vector)
     len    = length( exprs )
     fields = Array{Symbol}(len)
@@ -250,7 +248,7 @@ function make_tuple( exprs::Vector)
     end
 end
 
-@doc doc"""
+"""
 Syntax
 
     @NT( a, b )                 -> Defines a tuple with a and b as members
@@ -277,7 +275,7 @@ NamedTuples may be used anywhere you would use a regular Tuple, this includes me
 
     Test.foo( 1 ) # Returns a NamedTuple of 5 elements
     Test.bar( @NT( a= 2, c="hello")) # Returns `hellohello`
-""" ->
+"""
 macro NT( expr... )
     return esc(make_tuple( collect( expr )))
 end
@@ -324,11 +322,11 @@ end
     end
 end
 
-@doc doc"""
+"""
 Merge two NamedTuples favoring the lhs
 Order is preserved lhs names come first.
 This copies the underlying data.
-""" ->
+"""
 function Base.merge( lhs::NamedTuple, rhs::NamedTuple )
     nms = unique( vcat( fieldnames( lhs ), fieldnames( rhs )) )
     ty = create_namedtuple_type( nms )
@@ -345,19 +343,19 @@ function Base.getindex( t::NamedTuple, rng::AbstractVector )
     ty(tuple([getfield(t, i) for i in names]...))
 end
 
-@doc doc"""
+"""
 Create a new NamedTuple with the new value set on it, either overwriting
 the old value or appending a new value.
 This copies the underlying data.
-""" ->
+"""
 function setindex{V}( t::NamedTuple, key::Symbol, val::V)
     nt = create_namedtuple_type( [key] )( (val,) )
     return merge( t, nt )
 end
 
-@doc doc"""
+"""
 Create a new NamedTuple with the specified element removed.
-""" ->
+"""
 function delete( t::NamedTuple, key::Symbol )
     nms = filter(x -> x != key, collect(fieldnames(t)))
     ty = create_namedtuple_type( nms )
