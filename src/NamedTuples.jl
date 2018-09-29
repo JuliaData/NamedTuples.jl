@@ -116,11 +116,11 @@ function trans( ::Type{ParseNode{:quote}}, expr::Expr )
 end
 
 # Literal nodes
-function trans{T}( lit::T )
+function trans( lit::T ) where T
     return (nothing, nothing, lit)
 end
 
-function trans{T}( ::Type{ParseNode{T}}, expr::Expr)
+function trans( ::Type{ParseNode{T}}, expr::Expr) where T
     return (nothing, nothing, expr)
 end
 
